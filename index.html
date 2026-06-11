@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#9F8FD4">
+  <title>スキめも</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/style.css">
+  <!-- ホーム画面アイコン（assets/に画像を追加したら有効になります） -->
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+</head>
+<body>
+  <div id="root">
+    <!-- JS が読み込まれるまでの初期表示 -->
+    <header class="header">
+      <span class="header-title">スキめも　🐰</span>
+    </header>
+    <main class="main-content">
+      <p class="empty-msg">読み込み中…</p>
+    </main>
+  </div>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+const CACHE = 'sukimemo-v1';
+const ASSETS = [
+  '/sukimemo/',
+  '/sukimemo/index.html',
+  '/sukimemo/css/style.css',
+  '/sukimemo/js/db.js',
+  '/sukimemo/js/import.js',
+  '/sukimemo/js/app.js',
+  '/sukimemo/manifest.json',
+];
+
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    )
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', e => {
+  // note.com へのリクエストはキャッシュしない
+  if (e.request.url.includes('note.com')) return;
+  e.respondWith(
+    caches.match(e.request).then(r => r || fetch(e.request))
+  );
+});

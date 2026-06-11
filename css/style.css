@@ -1,0 +1,529 @@
+/* ── リセット・ベース ─────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic UI', sans-serif;
+  background: #FAF7F0;
+  color: #2C2C2A;
+  font-size: 15px;
+  line-height: 1.6;
+  min-height: 100dvh;
+}
+
+a { color: inherit; text-decoration: none; }
+a:hover { text-decoration: underline; }
+button { cursor: pointer; font: inherit; border: none; background: none; }
+input, textarea, select { font: inherit; }
+img { display: block; }
+
+/* ── レイアウト ───────────────────────────────────────────── */
+.main-content {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 0 0 80px;
+}
+
+/* ── ヘッダー ─────────────────────────────────────────────── */
+.header {
+  background: #9F8FD4;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header-title {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: .03em;
+}
+.header-btns { display: flex; gap: 4px; }
+.icon-btn {
+  font-size: 22px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: background .15s;
+}
+.icon-btn:hover { background: rgba(255,255,255,.2); }
+
+/* ── セットアップ画面 ─────────────────────────────────────── */
+.setup-card {
+  margin: 40px 16px;
+  background: #fff;
+  border-radius: 16px;
+  padding: 32px 24px;
+  box-shadow: 0 2px 12px rgba(0,0,0,.07);
+}
+.setup-heading {
+  font-size: 20px;
+  font-weight: 700;
+  color: #9F8FD4;
+  margin-bottom: 12px;
+}
+.setup-desc {
+  color: #888780;
+  font-size: 14px;
+  margin-bottom: 24px;
+  line-height: 1.7;
+}
+.setup-desc code { background: #EDE7F8; padding: 1px 5px; border-radius: 4px; }
+.setup-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.setup-input {
+  flex: 1;
+  border: 1.5px solid #B4B2A9;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 15px;
+  outline: none;
+  transition: border-color .15s;
+}
+.setup-input:focus { border-color: #9F8FD4; }
+.input-err { color: #993556; font-size: 13px; margin-top: 8px; }
+
+/* ── ボタン ───────────────────────────────────────────────── */
+.btn-primary {
+  background: #9F8FD4;
+  color: #fff;
+  border-radius: 8px;
+  padding: 9px 18px;
+  font-weight: 600;
+  font-size: 14px;
+  transition: opacity .15s;
+  white-space: nowrap;
+}
+.btn-primary:hover { opacity: .85; }
+.btn-primary.btn-wide { width: 100%; padding: 12px; font-size: 15px; margin-top: 8px; }
+
+.btn-secondary {
+  background: #EDE7F8;
+  color: #9F8FD4;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-weight: 600;
+  font-size: 13px;
+  display: inline-block;
+  transition: opacity .15s;
+  text-align: center;
+}
+.btn-secondary:hover { opacity: .8; }
+
+.btn-text {
+  color: #9F8FD4;
+  font-size: 13px;
+  padding: 2px 6px;
+  text-decoration: underline;
+}
+
+.btn-open-url {
+  background: #EDE7F8;
+  color: #7060B8;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: opacity .15s;
+}
+.btn-open-url:hover { opacity: .8; }
+
+.btn-confirm {
+  background: #FBE9F0;
+  color: #993556;
+  border: 1px solid #F0B8C8;
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.btn-confirm:hover { background: #F5D0DE; }
+
+.btn-revert {
+  background: #E4EEF8;
+  color: #185FA5;
+  border: 1px solid #B8D0E8;
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.btn-revert:hover { background: #D0E4F5; }
+
+.btn-bulk-confirm {
+  background: #EDE7F8;
+  color: #7060B8;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  width: 100%;
+  text-align: center;
+  transition: opacity .15s;
+}
+.btn-bulk-confirm:hover { opacity: .8; }
+
+/* ── タブ ─────────────────────────────────────────────────── */
+.tab-bar {
+  display: flex;
+  border-bottom: 2px solid #EDE7F8;
+  background: #fff;
+}
+.tab-btn {
+  flex: 1;
+  padding: 12px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #B4B2A9;
+  text-align: center;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: color .15s, border-color .15s;
+}
+.tab-btn.active {
+  color: #9F8FD4;
+  border-bottom-color: #9F8FD4;
+}
+
+/* ── フィルター行 ─────────────────────────────────────────── */
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px 8px;
+  flex-wrap: wrap;
+}
+.filter-btn {
+  border: 2px solid transparent;
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all .15s;
+}
+.filter-btn.unconf         { background: #FAF7F0; color: #888780; border-color: #E8E5DD; }
+.filter-btn.unconf.active  { background: #FBE9F0; color: #993556; border-color: #993556; }
+.filter-btn.conf           { background: #FAF7F0; color: #888780; border-color: #E8E5DD; }
+.filter-btn.conf.active    { background: #E4EEF8; color: #185FA5; border-color: #185FA5; }
+.count-badge {
+  background: rgba(0,0,0,.1);
+  border-radius: 10px;
+  padding: 1px 6px;
+  font-size: 11px;
+}
+
+.sort-wrap { margin-left: auto; }
+.sort-sel {
+  border: 1.5px solid #D4D0C8;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #888780;
+  background: #fff;
+  outline: none;
+}
+
+.bulk-row { padding: 4px 16px 8px; }
+
+/* ── カード共通 ───────────────────────────────────────────── */
+.person-card {
+  background: #fff;
+  border-radius: 12px;
+  margin: 8px 16px;
+  padding: 14px;
+  box-shadow: 0 1px 6px rgba(0,0,0,.06);
+}
+.person-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.avatar-placeholder {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #EDE7F8;
+  flex-shrink: 0;
+}
+.person-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.person-name {
+  font-weight: 700;
+  font-size: 14px;
+  color: #2C2C2A;
+  word-break: break-all;
+}
+.person-id {
+  font-size: 12px;
+  color: #888780;
+  width: 100%;
+}
+.person-date {
+  font-size: 11px;
+  color: #B4B2A9;
+  width: 100%;
+}
+.badge-new {
+  background: #EAF3DE;
+  color: #3B6D11;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 2px 7px;
+  flex-shrink: 0;
+}
+.card-actions { display: flex; justify-content: flex-end; }
+
+/* ── 記事行 ───────────────────────────────────────────────── */
+.articles-detail { margin-top: 4px; }
+.articles-summary {
+  font-size: 12px;
+  color: #888780;
+  cursor: pointer;
+  padding: 4px 0;
+  user-select: none;
+}
+.articles-single { }
+.article-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid #F0EDE6;
+}
+.article-link {
+  font-size: 13px;
+  color: #185FA5;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.article-link:hover { text-decoration: underline; }
+
+/* ── 確認済みリスト ───────────────────────────────────────── */
+.confirmed-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #fff;
+  border-radius: 10px;
+  margin: 6px 16px;
+  padding: 10px 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.05);
+}
+.confirmed-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.confirmed-user { font-size: 12px; color: #888780; }
+.confirmed-article { font-size: 13px; color: #185FA5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.confirmed-date { font-size: 11px; color: #B4B2A9; }
+
+/* ── 空状態・応援 ─────────────────────────────────────────── */
+.empty-msg {
+  text-align: center;
+  color: #888780;
+  font-size: 14px;
+  padding: 48px 24px;
+  line-height: 1.8;
+}
+.cheer-card {
+  background: #EDE7F8;
+  border-radius: 16px;
+  margin: 24px 16px;
+  padding: 28px 24px;
+  text-align: center;
+}
+.cheer-text {
+  color: #7060B8;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.7;
+}
+
+/* ── オーバーレイ・パネル ─────────────────────────────────── */
+.panel-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(44,44,42,.45);
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.panel {
+  background: #FAF7F0;
+  border-radius: 20px 20px 0 0;
+  width: 100%;
+  max-width: 600px;
+  max-height: 90dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid #E8E5DD;
+  flex-shrink: 0;
+}
+.panel-title { font-size: 16px; font-weight: 700; color: #2C2C2A; }
+.panel-close {
+  font-size: 18px;
+  color: #888780;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+.panel-close:hover { background: #EDE7F8; }
+
+.panel-tabs {
+  display: flex;
+  border-bottom: 1px solid #E8E5DD;
+  flex-shrink: 0;
+  background: #fff;
+}
+.panel-tab {
+  flex: 1;
+  padding: 10px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #B4B2A9;
+  text-align: center;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+  transition: all .15s;
+}
+.panel-tab.active { color: #9F8FD4; border-bottom-color: #9F8FD4; }
+
+.panel-body { overflow-y: auto; padding: 16px; flex: 1; }
+
+/* ── インポートセクション ─────────────────────────────────── */
+.import-section { display: flex; flex-direction: column; gap: 10px; }
+.import-desc { font-size: 13px; color: #888780; line-height: 1.7; }
+.import-open-row, .import-url-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.import-url-row { flex: 1; }
+.article-url-input {
+  flex: 1;
+  border: 1.5px solid #B4B2A9;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  outline: none;
+}
+.article-url-input:focus { border-color: #9F8FD4; }
+.import-page-label { font-size: 13px; color: #888780; white-space: nowrap; }
+
+.paste-area {
+  width: 100%;
+  height: 100px;
+  border: 1.5px solid #B4B2A9;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  resize: vertical;
+  outline: none;
+  background: #fff;
+  color: #2C2C2A;
+}
+.paste-area:focus { border-color: #9F8FD4; }
+
+.import-result { font-size: 13px; padding: 6px 10px; border-radius: 6px; font-weight: 600; }
+.import-result.ok  { background: #EAF3DE; color: #3B6D11; }
+.import-result.err { background: #FBE9F0; color: #993556; }
+
+.import-articles-label { font-size: 12px; color: #888780; margin-top: 4px; }
+.imported-articles {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.imported-articles li { display: flex; align-items: center; gap: 6px; }
+.article-select-btn {
+  font-size: 12px;
+  color: #185FA5;
+  text-decoration: underline;
+  text-align: left;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.article-imported-date { font-size: 11px; color: #B4B2A9; white-space: nowrap; flex-shrink: 0; }
+
+/* ── 設定パネル ───────────────────────────────────────────── */
+.settings-body { display: flex; flex-direction: column; gap: 20px; }
+.settings-row { display: flex; flex-direction: column; gap: 8px; }
+.settings-label { font-size: 12px; color: #888780; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+.settings-id-row { display: flex; align-items: center; gap: 8px; }
+.settings-id-val {
+  background: #EDE7F8;
+  color: #7060B8;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 14px;
+}
+.settings-actions { display: flex; flex-direction: column; gap: 8px; }
+
+/* ── TOPボタン ────────────────────────────────────────────── */
+.top-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 16px;
+  background: #9F8FD4;
+  color: #fff;
+  border-radius: 20px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgba(0,0,0,.15);
+  z-index: 150;
+}
+.top-btn:hover { opacity: .85; }
