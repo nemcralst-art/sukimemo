@@ -518,21 +518,41 @@ img { display: block; }
   flex-shrink: 0;
   padding: 2px 6px;
 }
-.bm-item {
-  background: #fff;
-  border-radius: 12px;
-  padding: 12px 14px;
-  box-shadow: 0 1px 4px rgba(0,0,0,.05);
-}
-.bm-item-head {
+
+/* ドラッグ&ドロップエリア */
+.bm-drag-box {
+  background: #EDE7F8;
+  border-radius: 14px;
+  padding: 14px 16px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 8px;
+}
+.bm-drag-label { font-size: 14px; color: #2C2C2A; }
+.bm-drag-hint  { font-size: 12px; color: #7060B8; }
+.bm-drag-links {
+  display: flex;
+  gap: 10px;
   flex-wrap: wrap;
 }
-.bm-item-title { font-size: 14px; font-weight: 700; }
-.bm-item-desc { font-size: 12px; color: #888780; margin-top: 6px; line-height: 1.6; }
+.bm-drag-btn {
+  background: #9F8FD4;
+  color: #fff;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: grab;
+  text-decoration: none !important;
+  user-select: none;
+  display: inline-block;
+  box-shadow: 0 2px 6px rgba(0,0,0,.15);
+  transition: opacity .15s;
+}
+.bm-drag-btn:hover { opacity: .85; }
+.bm-drag-note { font-size: 12px; color: #888780; }
+
+/* 手順のしかた折りたたみ */
 .bm-howto {
   background: #fff;
   border-radius: 12px;
@@ -545,14 +565,27 @@ img { display: block; }
   color: #7060B8;
   cursor: pointer;
   user-select: none;
+  line-height: 1.6;
 }
+.bm-steps-wrap { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+.bm-steps-intro { font-size: 12px; color: #888780; line-height: 1.6; }
 .bm-steps {
-  margin: 10px 0 4px 20px;
+  margin: 0 0 0 18px;
   font-size: 13px;
   color: #2C2C2A;
-  line-height: 1.9;
+  line-height: 2;
 }
-.bm-steps li { margin-bottom: 4px; }
+.bm-steps li { margin-bottom: 2px; }
+.bm-copy-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #FAF7F0;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.bm-copy-label { font-size: 13px; color: #2C2C2A; }
 
 /* ── 設定パネル ───────────────────────────────────────────── */
 .settings-body { display: flex; flex-direction: column; gap: 20px; }

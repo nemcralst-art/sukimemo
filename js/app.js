@@ -352,59 +352,93 @@ function appUrl() {
 function renderBookmarkletSection() {
   const bmLikes = likesBookmarklet(S.noteId, appUrl());
   const bmFoll  = followersBookmarklet(S.noteId, appUrl());
+  const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
+
   return `
     <div class="import-section">
       <p class="import-desc">
-        ブックマークレットを一度登録すれば、<strong>note.com を開いてブックマークを1タップするだけ</strong>で、
-        全ページぶんをまとめて取り込めます（コピペ不要）。
+        一度だけ登録すれば、<strong>note.com を開いてブックマークを1タップ</strong>するだけで、
+        全ページぶんをまとめて取り込めます（コピペ・ページ送り不要）。
       </p>
 
-      <div class="bm-item">
-        <div class="bm-item-head">
-          <span class="bm-item-title">💖 スキをまとめて取り込む</span>
-          <button class="btn-secondary bm-copy" data-code="${esc(bmLikes)}">コードをコピー</button>
+      ${!isMobile ? `
+      <div class="bm-drag-box">
+        <p class="bm-drag-label">📌 <strong>Mac / PC の方はドラッグするだけ</strong></p>
+        <p class="bm-drag-hint">ブックマークバーが見えない場合：Safari「表示」→「ブックマークバーを表示」（⌘⇧B）</p>
+        <div class="bm-drag-links">
+          <a class="bm-drag-btn" href="${bmLikes}" onclick="return false" draggable="true">💖 スキを取り込む</a>
+          <a class="bm-drag-btn" href="${bmFoll}"  onclick="return false" draggable="true">👥 フォロワーを取り込む</a>
         </div>
-        <p class="bm-item-desc">自分の全記事のスキを、記事タイトル付きで取り込みます。記事数が多いと1〜2分かかります。</p>
-      </div>
+        <p class="bm-drag-note">クリックせずに、上の<strong>ブックマークバーへドラッグ</strong>して登録してください</p>
+      </div>` : ''}
 
-      <div class="bm-item">
-        <div class="bm-item-head">
-          <span class="bm-item-title">👥 フォロワーをまとめて取り込む</span>
-          <button class="btn-secondary bm-copy" data-code="${esc(bmFoll)}">コードをコピー</button>
+      <details class="bm-howto" ${isMobile ? 'open' : ''}>
+        <summary class="bm-howto-summary">📱 iPhone Safari での登録方法</summary>
+        <div class="bm-steps-wrap">
+          <p class="bm-steps-intro">iPhoneではドラッグできません。一度だけコードの貼り付けが必要です。</p>
+          <ol class="bm-steps">
+            <li>下の「コードをコピー」を押す</li>
+            <li>Safari でこのアプリのページを開いたまま、<br>下の共有ボタン（□↑）→「ブックマークを追加」→「保存」</li>
+            <li>画面下の「ブックマーク（本のアイコン）」→ 右下「編集」</li>
+            <li>いま作ったブックマーク（アプリの名前）をタップ</li>
+            <li><strong>URL欄の中身を全部消して</strong>、コピーしたコードを貼り付け → 「完了」</li>
+            <li>次回から：note.com を開いた状態でブックマークをタップするだけ</li>
+          </ol>
+          ${copyRows(bmLikes, bmFoll)}
         </div>
-        <p class="bm-item-desc">フォロワーを全ページぶん（自動でページ送り）取り込みます。</p>
-      </div>
-
-      <details class="bm-howto">
-        <summary class="bm-howto-summary">📖 登録のしかた（Mac の Safari）</summary>
-        <ol class="bm-steps">
-          <li>上の「コードをコピー」を押す</li>
-          <li>Safari でこのページを開いたまま、メニューの「ブックマーク」→「ブックマークを追加…」（⌘D）</li>
-          <li>名前を「スキ取り込み」などに変えて保存</li>
-          <li>メニューの「ブックマーク」→「ブックマークを編集」を開く</li>
-          <li>いま作ったブックマークの<strong>URL欄を右クリック →「アドレスを編集」</strong>で、中身を全部消してコピーしたコードを貼り付け</li>
-          <li>note.com を開いた状態でそのブックマークを選ぶと、取り込みが始まります</li>
-        </ol>
       </details>
 
       <details class="bm-howto">
-        <summary class="bm-howto-summary">📖 登録のしかた（iPhone の Safari）</summary>
-        <ol class="bm-steps">
-          <li>上の「コードをコピー」を押す</li>
-          <li>Safari で適当なページを開き、共有ボタン（□に↑）→「ブックマークを追加」</li>
-          <li>名前を「スキ取り込み」などにして保存</li>
-          <li>ブックマーク一覧（本のアイコン）を開き、右下の「編集」→ いま作ったブックマークをタップ</li>
-          <li><strong>URL欄の中身を全部消して、コピーしたコードを貼り付け</strong>て「完了」</li>
-          <li>note.com を開いた状態でブックマーク一覧からタップすると、取り込みが始まります</li>
-        </ol>
+        <summary class="bm-howto-summary">⚡ iPhone ショートカット（ホーム画面アイコンで起動できる方法）</summary>
+        <div class="bm-steps-wrap">
+          <p class="bm-steps-intro">ホーム画面に「取り込み」アイコンを置きたい方はこちら。ブックマーク編集と手間は同程度ですが、後の操作がより簡単です。</p>
+          <ol class="bm-steps">
+            <li>下の「コードをコピー」を押す</li>
+            <li>「ショートカット」アプリを開く → 右上「＋」→「アクションを追加」</li>
+            <li>検索欄に「JavaScript」と入力 → 「現在の Web ページで JavaScript を実行」を選ぶ</li>
+            <li>アクションのコード欄に貼り付け</li>
+            <li>右上「完了」→ 名前を「スキ取り込み」などに変更</li>
+            <li>ショートカット一覧でそのアイテムを長押し →「ホーム画面に追加」</li>
+            <li>次回から：note.com を Safari で開いた状態でホーム画面のアイコンをタップ</li>
+          </ol>
+          ${copyRows(bmLikes, bmFoll)}
+        </div>
       </details>
+
+      ${!isMobile ? `
+      <details class="bm-howto">
+        <summary class="bm-howto-summary">📖 Mac Safari でコードを貼って登録する方法（ドラッグが難しい場合）</summary>
+        <div class="bm-steps-wrap">
+          <ol class="bm-steps">
+            <li>下の「コードをコピー」を押す</li>
+            <li>Safari で ⌘D → 名前を「スキ取り込み」などにして保存</li>
+            <li>メニュー「ブックマーク」→「ブックマークを編集」</li>
+            <li>いま作ったブックマークを右クリック → 「アドレスを編集」</li>
+            <li>URL欄の中身を全部消して、コードを貼り付け → Enter</li>
+          </ol>
+          ${copyRows(bmLikes, bmFoll)}
+        </div>
+      </details>` : ''}
 
       <p class="import-desc">
-        ※ 取り込みが終わると、このアプリが新しいタブで開いて自動保存されます。<br>
-        ※ note ID やアプリの場所が変わったときは、コードをコピーし直して登録し直してください。
+        ※ 取り込みが完了すると、このアプリが新しいタブで開いて自動保存されます。<br>
+        ※ note ID やアプリのURLが変わったときだけ、登録し直しが必要です。
       </p>
     </div>`;
 }
+
+function copyRows(bmLikes, bmFoll) {
+  return `
+    <div class="bm-copy-row">
+      <span class="bm-copy-label">💖 スキ用</span>
+      <button class="btn-secondary bm-copy" data-code="${esc(bmLikes)}">コードをコピー</button>
+    </div>
+    <div class="bm-copy-row">
+      <span class="bm-copy-label">👥 フォロワー用</span>
+      <button class="btn-secondary bm-copy" data-code="${esc(bmFoll)}">コードをコピー</button>
+    </div>`;
+}
+
 
 // ── 設定パネル ────────────────────────────────────────────────
 function renderSettingsPanel() {
