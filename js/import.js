@@ -36,6 +36,7 @@ export function parseFollowersJSON(jsonText) {
       profileImageUrl: u.userProfileImagePath ?? u.icon ?? '',
       detectedDate:    now,
       status:          'unconfirmed',
+      isNew:           false, // db側で新規判定して立てる
     }))
     .filter(f => f.userId);
 

@@ -249,7 +249,7 @@ function renderFollowersTab(followers) {
 }
 
 function renderFollowerCard(f) {
-  const isNew = f.status === 'unconfirmed';
+  const isNew = f.isNew === true;
   return `
     <div class="person-card" data-user="${esc(f.userId)}">
       <div class="person-head">
@@ -501,7 +501,8 @@ function bindImportPanel() {
     if (!text) { setImportMsg('JSONを貼り付けてください', false); return; }
     try {
       const { followers, isLastPage, nextPage } = parseFollowersJSON(text);
-      const added = await db.upsertFollowersNew(followers);
+      // ページ1の取り込み＝新しいセッションの開始。前回ぶんのNEWを外す
+      const added = await db.upsertFollowersNew(followers, S.follPage === 1);
       S.follPage = isLastPage ? 1 : (nextPage ?? S.follPage + 1);
       const more = isLastPage ? '' : `　次のページ（${S.follPage}）もあります。`;
       setImportMsg(`${added}人の新しいフォロワーを追加しました（${followers.length}件取得）。${more}`, true);

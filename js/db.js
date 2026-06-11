@@ -90,23 +90,49 @@ export async function upsertLikesNew(likes) {
   });
 }
 
-export async function upsertFollowersNew(followers) {
+export async function upsertFollowersNew(followers, clearNewFirst = false) {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const t = db.transaction('followers', 'readwrite');
     const store = t.objectStore('followers');
     let added = 0;
-    let pending = followers.length;
-    if (pending === 0) { resolve(0); return; }
-    followers.forEach(f => {
-      const get = store.get(f.userId);
-      get.onsuccess = () => {
-        if (!get.result) { store.put(f); added++; }
-        pending--;
-        if (pending === 0) resolve(added);
+
+    const run = () => {
+      let pending = followers.length;
+      if (pending === 0) { resolve(0); return; }
+      followers.forEach(f => {
+        const get = store.get(f.userId);
+        get.onsuccess = () => {
+          if (!get.result) {
+            // 今回初めて現れたIDだけ isNew を立てる
+            store.put({ ...f, isNew: true });
+            added++;
+          }
+          pending--;
+          if (pending === 0) resolve(added);
+        };
+        get.onerror = () => { pending--; if (pending === 0) resolve(added); };
+      });
+    };
+
+    if (clearNewFirst) {
+      // 取り込みセッションの開始時：前回ぶんの NEW をすべて外す
+      const cursorReq = store.openCursor();
+      cursorReq.onsuccess = e => {
+        const cursor = e.target.result;
+        if (cursor) {
+          if (cursor.value.isNew) {
+            cursor.update({ ...cursor.value, isNew: false });
+          }
+          cursor.continue();
+        } else {
+          run();
+        }
       };
-      get.onerror = () => { pending--; if (pending === 0) resolve(added); };
-    });
+      cursorReq.onerror = () => run();
+    } else {
+      run();
+    }
     t.onerror = () => reject(t.error);
   });
 }
