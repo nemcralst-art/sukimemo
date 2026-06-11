@@ -73,7 +73,7 @@ export function parseLikesJSON(jsonText, noteKey, articleTitle, articleUrl) {
         userName:        u.nickname ?? u.name ?? u.urlname ?? '不明',
         userNoteId:      u.urlname ?? '',
         profileUrl:      u.urlname ? `https://note.com/${u.urlname}` : '',
-        profileImageUrl: u.userProfileImagePath ?? u.icon ?? '',
+        profileImageUrl: u.user_profile_image_url ?? u.userProfileImagePath ?? u.icon ?? '',
         noteKey,
         articleTitle:    articleTitle || noteKey,
         articleUrl:      articleUrl || `https://note.com/n/${noteKey}`,
