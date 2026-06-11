@@ -8,8 +8,11 @@ export function parseFollowersJSON(jsonText) {
   }
 
   // APIレスポンスの複数パターンに対応
+  // 実測：/api/v2/creators/{id}/followers は data.follows に配列が入る
   const users =
-    data?.data?.users ??      // /api/v2/creators/{id}/followers
+    data?.data?.follows ??    // 実測の正しいパス
+    data?.data?.users ??
+    data?.follows ??
     data?.users ??
     (Array.isArray(data?.data) ? data.data : null) ??
     (Array.isArray(data) ? data : null);
@@ -19,6 +22,7 @@ export function parseFollowersJSON(jsonText) {
   }
 
   const isLastPage = data?.data?.isLastPage ?? true;
+  // nextPage が無ければ isLastPage を見て呼び出し側でページを進める
   const nextPage   = data?.data?.nextPage ?? null;
   const now = new Date().toISOString();
 
