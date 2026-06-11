@@ -80,7 +80,14 @@ export async function upsertLikesNew(likes) {
     likes.forEach(like => {
       const get = store.get(like.id);
       get.onsuccess = () => {
-        if (!get.result) { store.put(like); added++; }
+        if (!get.result) {
+          store.put(like);
+          added++;
+        } else if (like.articleTitle && like.articleTitle !== like.noteKey &&
+                   get.result.articleTitle !== like.articleTitle) {
+          // 記事タイトルが新たに分かった場合は既存レコードにも反映（status等は保持）
+          store.put({ ...get.result, articleTitle: like.articleTitle, articleUrl: like.articleUrl });
+        }
         pending--;
         if (pending === 0) resolve(added);
       };

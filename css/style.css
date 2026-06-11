@@ -498,6 +498,62 @@ img { display: block; }
 }
 .article-imported-date { font-size: 11px; color: #B4B2A9; white-space: nowrap; flex-shrink: 0; }
 
+/* ── ブックマークレット ───────────────────────────────────── */
+.bm-banner {
+  background: #EAF3DE;
+  color: #3B6D11;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 10px;
+  margin: 10px 16px 0;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.bm-banner-close {
+  color: #3B6D11;
+  font-size: 14px;
+  flex-shrink: 0;
+  padding: 2px 6px;
+}
+.bm-item {
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.05);
+}
+.bm-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.bm-item-title { font-size: 14px; font-weight: 700; }
+.bm-item-desc { font-size: 12px; color: #888780; margin-top: 6px; line-height: 1.6; }
+.bm-howto {
+  background: #fff;
+  border-radius: 12px;
+  padding: 10px 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.05);
+}
+.bm-howto-summary {
+  font-size: 13px;
+  font-weight: 600;
+  color: #7060B8;
+  cursor: pointer;
+  user-select: none;
+}
+.bm-steps {
+  margin: 10px 0 4px 20px;
+  font-size: 13px;
+  color: #2C2C2A;
+  line-height: 1.9;
+}
+.bm-steps li { margin-bottom: 4px; }
+
 /* ── 設定パネル ───────────────────────────────────────────── */
 .settings-body { display: flex; flex-direction: column; gap: 20px; }
 .settings-row { display: flex; flex-direction: column; gap: 8px; }

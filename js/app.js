@@ -1,5 +1,6 @@
 import * as db from './db.js';
-import { parseFollowersJSON, parseLikesJSON, extractNoteKey } from './import.js';
+import { parseFollowersJSON, parseLikesJSON, extractNoteKey, followersFromRaw, likesFromRaw } from './import.js';
+import { followersBookmarklet, likesBookmarklet } from './bookmarklet.js';
 
 // ── アプリ名（1箇所で管理） ───────────────────────────────────
 const APP_NAME = 'スキめも';
@@ -21,7 +22,7 @@ const S = {
   likesSort:       'newest',     // 'newest' | 'by-article'
   follFilter:      'unconfirmed',
   panel:           null,         // null | 'import' | 'settings' | 'export'
-  importTab:       'likes',
+  importTab:       'bookmarklet',
   follPage:        1,
   importMsg:       '',
   importMsgOk:     true,
@@ -29,6 +30,8 @@ const S = {
   pendingNoteKey:  '',
   pendingTitle:    '',
   pendingUrl:      '',
+  // ブックマークレット受信結果（画面上部に表示）
+  bmResult:        '',
 };
 
 // ── ユーティリティ ────────────────────────────────────────────
@@ -56,6 +59,7 @@ async function render() {
   root.innerHTML = `
     ${renderHeader()}
     <main class="main-content">
+      ${S.bmResult ? `<div class="bm-banner">${esc(S.bmResult)}<button class="bm-banner-close" id="bm-banner-close">✕</button></div>` : ''}
       ${renderTabs()}
       <div id="tab-content">
         ${S.tab === 'likes' ? renderLikesTab(likes) : renderFollowersTab(followers)}
@@ -327,13 +331,78 @@ async function renderImportPanel() {
           <button class="panel-close" id="panel-close">✕</button>
         </div>
         <div class="panel-tabs">
+          <button class="panel-tab ${S.importTab==='bookmarklet'?'active':''}" data-itab="bookmarklet">かんたん</button>
           <button class="panel-tab ${S.importTab==='likes'?'active':''}"     data-itab="likes">スキ</button>
           <button class="panel-tab ${S.importTab==='followers'?'active':''}" data-itab="followers">フォロワー</button>
         </div>
         <div class="panel-body">
-          ${S.importTab === 'likes' ? likesHtml : follHtml}
+          ${S.importTab === 'bookmarklet' ? renderBookmarkletSection()
+            : S.importTab === 'likes' ? likesHtml : follHtml}
         </div>
       </div>
+    </div>`;
+}
+
+// ── ブックマークレット（かんたん取込） ────────────────────────
+function appUrl() {
+  // index.html を含まない正規のアプリURL
+  return location.origin + location.pathname.replace(/index\.html$/, '');
+}
+
+function renderBookmarkletSection() {
+  const bmLikes = likesBookmarklet(S.noteId, appUrl());
+  const bmFoll  = followersBookmarklet(S.noteId, appUrl());
+  return `
+    <div class="import-section">
+      <p class="import-desc">
+        ブックマークレットを一度登録すれば、<strong>note.com を開いてブックマークを1タップするだけ</strong>で、
+        全ページぶんをまとめて取り込めます（コピペ不要）。
+      </p>
+
+      <div class="bm-item">
+        <div class="bm-item-head">
+          <span class="bm-item-title">💖 スキをまとめて取り込む</span>
+          <button class="btn-secondary bm-copy" data-code="${esc(bmLikes)}">コードをコピー</button>
+        </div>
+        <p class="bm-item-desc">自分の全記事のスキを、記事タイトル付きで取り込みます。記事数が多いと1〜2分かかります。</p>
+      </div>
+
+      <div class="bm-item">
+        <div class="bm-item-head">
+          <span class="bm-item-title">👥 フォロワーをまとめて取り込む</span>
+          <button class="btn-secondary bm-copy" data-code="${esc(bmFoll)}">コードをコピー</button>
+        </div>
+        <p class="bm-item-desc">フォロワーを全ページぶん（自動でページ送り）取り込みます。</p>
+      </div>
+
+      <details class="bm-howto">
+        <summary class="bm-howto-summary">📖 登録のしかた（Mac の Safari）</summary>
+        <ol class="bm-steps">
+          <li>上の「コードをコピー」を押す</li>
+          <li>Safari でこのページを開いたまま、メニューの「ブックマーク」→「ブックマークを追加…」（⌘D）</li>
+          <li>名前を「スキ取り込み」などに変えて保存</li>
+          <li>メニューの「ブックマーク」→「ブックマークを編集」を開く</li>
+          <li>いま作ったブックマークの<strong>URL欄を右クリック →「アドレスを編集」</strong>で、中身を全部消してコピーしたコードを貼り付け</li>
+          <li>note.com を開いた状態でそのブックマークを選ぶと、取り込みが始まります</li>
+        </ol>
+      </details>
+
+      <details class="bm-howto">
+        <summary class="bm-howto-summary">📖 登録のしかた（iPhone の Safari）</summary>
+        <ol class="bm-steps">
+          <li>上の「コードをコピー」を押す</li>
+          <li>Safari で適当なページを開き、共有ボタン（□に↑）→「ブックマークを追加」</li>
+          <li>名前を「スキ取り込み」などにして保存</li>
+          <li>ブックマーク一覧（本のアイコン）を開き、右下の「編集」→ いま作ったブックマークをタップ</li>
+          <li><strong>URL欄の中身を全部消して、コピーしたコードを貼り付け</strong>て「完了」</li>
+          <li>note.com を開いた状態でブックマーク一覧からタップすると、取り込みが始まります</li>
+        </ol>
+      </details>
+
+      <p class="import-desc">
+        ※ 取り込みが終わると、このアプリが新しいタブで開いて自動保存されます。<br>
+        ※ note ID やアプリの場所が変わったときは、コードをコピーし直して登録し直してください。
+      </p>
     </div>`;
 }
 
@@ -427,6 +496,9 @@ function bindMain(likes, followers) {
     });
   }
 
+  // ブックマークレット結果バナーを閉じる
+  $('bm-banner-close')?.addEventListener('click', () => { S.bmResult = ''; render(); });
+
   // パネル共通：閉じる・オーバーレイクリック
   $('panel-close')?.addEventListener('click', () => { S.panel = null; render(); });
   $('panel-overlay')?.addEventListener('click', e => {
@@ -489,6 +561,20 @@ function bindMain(likes, followers) {
 
 // ── インポートパネルのバインド ────────────────────────────────
 function bindImportPanel() {
+  // ブックマークレットのコードコピー
+  document.querySelectorAll('.bm-copy').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(btn.dataset.code);
+        btn.textContent = 'コピーしました ✓';
+        setTimeout(() => { btn.textContent = 'コードをコピー'; }, 2000);
+      } catch {
+        // クリップボードが使えない環境向けのフォールバック
+        prompt('下のコードを全選択してコピーしてください', btn.dataset.code);
+      }
+    });
+  });
+
   // フォロワー：開く
   $('btn-open-follower')?.addEventListener('click', () => {
     const url = `https://note.com/api/v2/creators/${encodeURIComponent(S.noteId)}/followers?page=${S.follPage}`;
@@ -572,8 +658,61 @@ function setImportMsg(msg, ok) {
   }
 }
 
+// ── ブックマークレットからの受信（postMessage） ───────────────
+let bmProcessing = false;
+
+async function handleBookmarkletMessage(e) {
+  // 送信元が note.com であることを必ず検証する
+  if (e.origin !== 'https://note.com') return;
+  const msg = e.data;
+  if (!msg || typeof msg.type !== 'string') return;
+  if (bmProcessing) { ack(e); return; } // 再送ぶんは無視してackだけ返す
+
+  if (msg.type === 'sukimemo:followers' && Array.isArray(msg.follows)) {
+    bmProcessing = true;
+    ack(e);
+    const followers = followersFromRaw(msg.follows);
+    const added = await db.upsertFollowersNew(followers, true);
+    S.bmResult = `フォロワーを取り込みました：新規 ${added}人（全${followers.length}人を確認）`;
+    S.tab = 'followers';
+    S.panel = null;
+    await render();
+    bmProcessing = false;
+  }
+
+  if (msg.type === 'sukimemo:likes' && Array.isArray(msg.articles)) {
+    bmProcessing = true;
+    ack(e);
+    let totalAdded = 0, totalSeen = 0;
+    for (const art of msg.articles) {
+      if (!art?.key) continue;
+      const likes = likesFromRaw(art.likes ?? [], art.key, art.title, art.url);
+      totalSeen += likes.length;
+      totalAdded += await db.upsertLikesNew(likes);
+      if (likes.length > 0 || art.title) {
+        await db.upsertArticle({
+          noteKey: art.key,
+          title: art.title || art.key,
+          url: art.url || `https://note.com/n/${art.key}`,
+          lastImported: new Date().toISOString(),
+        });
+      }
+    }
+    S.bmResult = `スキを取り込みました：新規 ${totalAdded}件（${msg.articles.length}記事・全${totalSeen}件を確認）`;
+    S.tab = 'likes';
+    S.panel = null;
+    await render();
+    bmProcessing = false;
+  }
+}
+
+function ack(e) {
+  try { e.source?.postMessage({ type: 'sukimemo:ack' }, e.origin); } catch {}
+}
+
 // ── 起動 ─────────────────────────────────────────────────────
 async function init() {
+  window.addEventListener('message', handleBookmarkletMessage);
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sukimemo/sw.js').catch(() => {});
   }

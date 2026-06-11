@@ -25,22 +25,25 @@ export function parseFollowersJSON(jsonText) {
   const isLastPage = data?.data?.isLastPage ?? true;
   // nextPage が無ければ isLastPage を見て呼び出し側でページを進める
   const nextPage   = data?.data?.nextPage ?? null;
-  const now = new Date().toISOString();
 
-  const followers = users
+  return { followers: followersFromRaw(users), isLastPage, nextPage };
+}
+
+// 生のユーザー配列 → 保存形式（コピペ取り込み・ブックマークレット共用）
+export function followersFromRaw(users) {
+  const now = new Date().toISOString();
+  return users
     .map(u => ({
       userId:          String(u.id ?? u.userId ?? ''),
       userName:        u.nickname ?? u.name ?? u.urlname ?? '不明',
       userNoteId:      u.urlname ?? '',
       profileUrl:      u.urlname ? `https://note.com/${u.urlname}` : '',
-      profileImageUrl: u.userProfileImagePath ?? u.icon ?? '',
+      profileImageUrl: u.user_profile_image_url ?? u.userProfileImagePath ?? u.icon ?? '',
       detectedDate:    now,
       status:          'unconfirmed',
       isNew:           false, // db側で新規判定して立てる
     }))
     .filter(f => f.userId);
-
-  return { followers, isLastPage, nextPage };
 }
 
 export function parseLikesJSON(jsonText, noteKey, articleTitle, articleUrl) {
@@ -60,9 +63,13 @@ export function parseLikesJSON(jsonText, noteKey, articleTitle, articleUrl) {
     throw new Error('スキデータが見つかりませんでした。ページのJSONをそのまま全選択コピーして貼り付けてください。');
   }
 
-  const now = new Date().toISOString();
+  return { likes: likesFromRaw(rawLikes, noteKey, articleTitle, articleUrl) };
+}
 
-  const likes = rawLikes
+// 生のスキ配列 → 保存形式（コピペ取り込み・ブックマークレット共用）
+export function likesFromRaw(rawLikes, noteKey, articleTitle, articleUrl) {
+  const now = new Date().toISOString();
+  return rawLikes
     .map(item => {
       const u = item.user ?? item;
       const userId = String(u.id ?? u.userId ?? '');
@@ -83,8 +90,6 @@ export function parseLikesJSON(jsonText, noteKey, articleTitle, articleUrl) {
       };
     })
     .filter(Boolean);
-
-  return { likes };
 }
 
 // URLまたは入力文字列からnoteKeyを抽出
