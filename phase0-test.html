@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 0 – note API 疎通テスト</title>
+  <style>
+    body { font-family: sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.2rem; }
+    input { width: 200px; padding: .4rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 4px; }
+    button { padding: .4rem 1rem; font-size: 1rem; cursor: pointer; }
+    pre { background: #f4f4f4; padding: 1rem; overflow-x: auto; font-size: .82rem; border-radius: 4px; white-space: pre-wrap; word-break: break-all; }
+    .ok  { color: green; font-weight: bold; }
+    .err { color: red;   font-weight: bold; }
+    section { margin-top: 1.5rem; }
+    h2 { font-size: 1rem; margin-bottom: .4rem; }
+  </style>
+</head>
+<body>
+<h1>Phase 0 – note API 疎通テスト</h1>
+<p>note ID を入力して各ボタンを押してください。結果をそのままコピーして教えていただけると助かります。</p>
+
+<div>
+  <input id="noteId" type="text" placeholder="例: your_note_id" />
+</div>
+
+<section>
+  <h2>① フォロワー一覧</h2>
+  <button onclick="testFollowers()">取得テスト</button>
+  <pre id="res-followers">（未実行）</pre>
+</section>
+
+<section>
+  <h2>② 自分のノート一覧（スキ数確認用）</h2>
+  <button onclick="testNotes()">取得テスト</button>
+  <pre id="res-notes">（未実行）</pre>
+</section>
+
+<section>
+  <h2>③ 直近ノートへのスキ一覧（最初に見つかったノートで試行）</h2>
+  <button onclick="testLikes()">取得テスト（②の後に実行）</button>
+  <pre id="res-likes">（未実行）</pre>
+</section>
+
+<script>
+let firstNoteKey = null; // ②で取得したノートキーを③で使う
+
+function noteId() {
+  return document.getElementById('noteId').value.trim();
+}
+
+function show(id, ok, data) {
+  const el = document.getElementById(id);
+  el.textContent = (ok ? '✅ OK\n' : '❌ NG\n') + JSON.stringify(data, null, 2);
+  el.className = ok ? 'ok' : 'err';
+}
+
+async function fetchJSON(url) {
+  const res = await fetch(url, { credentials: 'include' });
+  const json = await res.json();
+  return { status: res.status, ok: res.ok, json };
+}
+
+async function testFollowers() {
+  const id = noteId();
+  if (!id) { alert('note ID を入力してください'); return; }
+  const el = document.getElementById('res-followers');
+  el.textContent = '取得中...';
+  try {
+    const url = `https://note.com/api/v2/creators/${id}/followers?page=1`;
+    const { status, ok, json } = await fetchJSON(url);
+    show('res-followers', ok, { status, url, body: json });
+  } catch (e) {
+    show('res-followers', false, { error: String(e) });
+  }
+}
+
+async function testNotes() {
+  const id = noteId();
+  if (!id) { alert('note ID を入力してください'); return; }
+  const el = document.getElementById('res-notes');
+  el.textContent = '取得中...';
+  try {
+    const url = `https://note.com/api/v2/creators/${id}/contents?kind=note&page=1`;
+    const { status, ok, json } = await fetchJSON(url);
+    // 最初のノートキーを保持
+    const contents = json?.data?.contents;
+    if (Array.isArray(contents) && contents.length > 0) {
+      firstNoteKey = contents[0].key;
+    }
+    show('res-notes', ok, { status, url, firstNoteKey, body: json });
+  } catch (e) {
+    show('res-notes', false, { error: String(e) });
+  }
+}
+
+async function testLikes() {
+  if (!firstNoteKey) { alert('先に②を実行してください'); return; }
+  const el = document.getElementById('res-likes');
+  el.textContent = '取得中...';
+  try {
+    const url = `https://note.com/api/v1/notes/${firstNoteKey}/likes?page=1`;
+    const { status, ok, json } = await fetchJSON(url);
+    show('res-likes', ok, { status, url, noteKey: firstNoteKey, body: json });
+  } catch (e) {
+    show('res-likes', false, { error: String(e) });
+  }
+}
+</script>
+</body>
+</html>
