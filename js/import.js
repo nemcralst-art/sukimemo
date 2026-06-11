@@ -18,7 +18,8 @@ export function parseFollowersJSON(jsonText) {
     (Array.isArray(data) ? data : null);
 
   if (!users || !Array.isArray(users)) {
-    throw new Error('フォロワーデータが見つかりませんでした。ページのJSONをそのまま全選択コピーして貼り付けてください。');
+    const found = Object.keys(data?.data ?? {}).join(', ') || '（キーなし）';
+    throw new Error(`フォロワーデータが見つかりませんでした。data 内のキー：${found}`);
   }
 
   const isLastPage = data?.data?.isLastPage ?? true;

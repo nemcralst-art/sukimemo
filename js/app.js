@@ -21,7 +21,7 @@ const S = {
   likesSort:       'newest',     // 'newest' | 'by-article'
   follFilter:      'unconfirmed',
   panel:           null,         // null | 'import' | 'settings' | 'export'
-  importTab:       'followers',
+  importTab:       'likes',
   follPage:        1,
   importMsg:       '',
   importMsgOk:     true,
@@ -327,11 +327,11 @@ async function renderImportPanel() {
           <button class="panel-close" id="panel-close">✕</button>
         </div>
         <div class="panel-tabs">
-          <button class="panel-tab ${S.importTab==='followers'?'active':''}" data-itab="followers">フォロワー</button>
           <button class="panel-tab ${S.importTab==='likes'?'active':''}"     data-itab="likes">スキ</button>
+          <button class="panel-tab ${S.importTab==='followers'?'active':''}" data-itab="followers">フォロワー</button>
         </div>
         <div class="panel-body">
-          ${S.importTab === 'followers' ? follHtml : likesHtml}
+          ${S.importTab === 'likes' ? likesHtml : follHtml}
         </div>
       </div>
     </div>`;
