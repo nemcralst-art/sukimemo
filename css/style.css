@@ -421,7 +421,8 @@ img { display: block; }
 }
 .confirmed-user { font-size: 12px; color: #888780; }
 .confirmed-article { font-size: 13px; color: #185FA5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.confirmed-date { font-size: 11px; color: #B4B2A9; }
+.confirmed-date-row { font-size: 11px; color: #B4B2A9; }
+.confirmed-date-sub { color: #C8C5BC; }
 
 /* ── 空状態・応援 ─────────────────────────────────────────── */
 .empty-msg {

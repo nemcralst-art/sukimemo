@@ -220,7 +220,7 @@ function renderLikesUnconfirmed(items, allLikes) {
 
 function renderLikesConfirmed(items) {
   return [...items]
-    .sort((a, b) => (b.detectedDate ?? '').localeCompare(a.detectedDate ?? ''))
+    .sort((a, b) => (b.confirmedDate ?? b.detectedDate ?? '').localeCompare(a.confirmedDate ?? a.detectedDate ?? ''))
     .map(l => `
       <div class="confirmed-row">
         <div class="confirmed-meta">
@@ -228,7 +228,8 @@ function renderLikesConfirmed(items) {
           <span class="confirmed-article">
             <a href="${esc(l.articleUrl)}" target="_blank" rel="noopener">${esc(l.articleTitle)}</a>
           </span>
-          <span class="confirmed-date">${formatDate(l.detectedDate)}</span>
+          <span class="confirmed-date-row">スキされた日：${formatDate(l.likedDate)}</span>
+          <span class="confirmed-date-row confirmed-date-sub">確認した日：${l.confirmedDate ? formatDate(l.confirmedDate) : '—'}</span>
         </div>
         <button class="btn-revert" data-id="${esc(l.id)}" data-type="like">戻す</button>
       </div>`).join('');

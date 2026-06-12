@@ -151,7 +151,11 @@ export async function updateLikeStatus(id, status) {
     const store = t.objectStore('likes');
     const get = store.get(id);
     get.onsuccess = () => {
-      if (get.result) { get.result.status = status; store.put(get.result); }
+      if (get.result) {
+        get.result.status = status;
+        if (status === 'confirmed') get.result.confirmedDate = new Date().toISOString();
+        store.put(get.result);
+      }
       resolve();
     };
     get.onerror = () => reject(get.error);
@@ -178,11 +182,13 @@ export async function confirmLikesByIds(ids) {
   return new Promise((resolve, reject) => {
     const t = db.transaction('likes', 'readwrite');
     const store = t.objectStore('likes');
+    const now = new Date().toISOString();
     ids.forEach(id => {
       const get = store.get(id);
       get.onsuccess = () => {
         if (get.result && get.result.status === 'unconfirmed') {
           get.result.status = 'confirmed';
+          get.result.confirmedDate = now;
           store.put(get.result);
         }
       };
