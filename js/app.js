@@ -5,7 +5,17 @@ import { followersBookmarklet, likesBookmarklet } from './bookmarklet.js';
 // ── アプリ名（1箇所で管理） ───────────────────────────────────
 const APP_NAME = 'スキめも';
 
-// ── セリフ（未確認0件時） ─────────────────────────────────────
+// ── デフォルト応援キャラ（6枚 assets/ に同梱） ───────────────
+const DEFAULT_CHARAS = [
+  'assets/chara-1.png',
+  'assets/chara-2.png',
+  'assets/chara-3.png',
+  'assets/chara-4.png',
+  'assets/chara-5.png',
+  'assets/chara-6.png',
+];
+
+
 const CHEERS = [
   'ぜんぶ確認できたね、おつかれさま！',
   'ぜんぶ見たね、えらい🌙',
@@ -30,6 +40,8 @@ const S = {
   pendingNoteKey:  '',
   pendingTitle:    '',
   pendingUrl:      '',
+  // 応援キャラ（null = デフォルトランダム、string = カスタム画像のDataURL）
+  customChara:     null,
   // ブックマークレット受信結果（画面上部に表示）
   bmResult:        '',
   // スキ一括確認の確認ダイアログ { ids: [...], label: '...' } | null
@@ -306,7 +318,12 @@ function emptyState(msg) {
   return `<p class="empty-msg">${esc(msg)}</p>`;
 }
 function cheerCard() {
-  return `<div class="cheer-card"><p class="cheer-text">${esc(randomCheer())}</p></div>`;
+  const src = S.customChara || DEFAULT_CHARAS[Math.floor(Math.random() * DEFAULT_CHARAS.length)];
+  return `
+    <div class="cheer-card">
+      <img class="cheer-img" src="${esc(src)}" alt="" onerror="this.style.display='none'">
+      <p class="cheer-text">${esc(randomCheer())}</p>
+    </div>`;
 }
 
 // ── インポートパネル ──────────────────────────────────────────
@@ -485,6 +502,21 @@ function renderSettingsPanel() {
             </div>
           </div>
           <div class="settings-row">
+            <label class="settings-label">応援キャラ</label>
+            <div class="settings-chara-row">
+              <img class="settings-chara-preview" src="${esc(S.customChara || DEFAULT_CHARAS[0])}" alt="">
+              <div class="settings-chara-btns">
+                <label class="btn-secondary settings-chara-select">
+                  自分の画像を選ぶ
+                  <input type="file" accept="image/*" id="chara-file-input" style="display:none">
+                </label>
+                <button class="btn-secondary" id="btn-chara-reset">デフォルトに戻す</button>
+              </div>
+            </div>
+            ${S.customChara ? '<p class="settings-chara-note">カスタム画像が設定されています</p>'
+              : '<p class="settings-chara-note">デフォルト（6枚からランダム）</p>'}
+          </div>
+          <div class="settings-row">
             <label class="settings-label">データ管理</label>
             <div class="settings-actions">
               <button class="btn-secondary" id="btn-export">JSONでエクスポート</button>
@@ -648,12 +680,28 @@ function bindMain(likes, followers) {
         const data = JSON.parse(text);
         await db.importAll(data);
         if (data.settings?.noteId) { S.noteId = data.settings.noteId; }
+        if (data.settings?.customChara !== undefined) { S.customChara = data.settings.customChara; }
         S.panel = null;
         alert('インポートしました。');
         render();
       } catch {
         alert('読み込みに失敗しました。ファイルを確認してください。');
       }
+    });
+    // 応援キャラ：ファイル選択
+    $('chara-file-input')?.addEventListener('change', async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const dataUrl = await compressImage(file, 400, 0.75);
+      S.customChara = dataUrl;
+      await db.setSetting('customChara', dataUrl);
+      render();
+    });
+    // 応援キャラ：デフォルトに戻す
+    $('btn-chara-reset')?.addEventListener('click', async () => {
+      S.customChara = null;
+      await db.setSetting('customChara', null);
+      render();
     });
   }
 
@@ -764,6 +812,26 @@ function setImportMsg(msg, ok) {
   }
 }
 
+// ── 画像圧縮（カスタムキャラ用） ─────────────────────────────
+function compressImage(file, maxSize = 400, quality = 0.75) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+      const w = Math.round(img.width  * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/webp', quality));
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
 // ── ブックマークレットからの受信（postMessage） ───────────────
 let bmProcessing = false;
 
@@ -823,6 +891,7 @@ async function init() {
     navigator.serviceWorker.register('/sukimemo/sw.js').catch(() => {});
   }
   S.noteId = await db.getSetting('noteId');
+  S.customChara = await db.getSetting('customChara') ?? null;
   await render();
 }
 
