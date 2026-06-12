@@ -7,12 +7,12 @@ const APP_NAME = 'スキめも';
 
 // ── デフォルト応援キャラ（6枚 assets/ に同梱） ───────────────
 const DEFAULT_CHARAS = [
-  'assets/chara-1.png',
-  'assets/chara-2.png',
-  'assets/chara-3.png',
-  'assets/chara-4.png',
-  'assets/chara-5.png',
-  'assets/chara-6.png',
+  'assets/好きメモ１.png',
+  'assets/好きメモ２.png',
+  'assets/好きメモ３.png',
+  'assets/好きメモ４.png',
+  'assets/好きメモ５.png',
+  'assets/好きメモ６.png',
 ];
 
 
