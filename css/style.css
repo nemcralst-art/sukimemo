@@ -239,7 +239,74 @@ img { display: block; }
   outline: none;
 }
 
-.bulk-row { padding: 4px 16px 8px; }
+.bulk-row {
+  padding: 4px 16px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.bulk-date-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.bulk-date-input {
+  border: 1.5px solid #D4D0C8;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 13px;
+  color: #2C2C2A;
+  background: #fff;
+  outline: none;
+  flex-shrink: 0;
+}
+.bulk-date-input:focus { border-color: #9F8FD4; }
+.btn-bulk-date {
+  background: #EDE7F8;
+  color: #7060B8;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  flex: 1;
+  transition: opacity .15s;
+}
+.btn-bulk-date:hover { opacity: .8; }
+
+/* 一括確認ダイアログ */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(44,44,42,.45);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.confirm-box {
+  background: #FAF7F0;
+  border-radius: 16px;
+  padding: 24px 20px;
+  max-width: 360px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.confirm-text {
+  font-size: 14px;
+  color: #2C2C2A;
+  line-height: 1.7;
+  text-align: center;
+}
+.confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.confirm-actions .btn-primary,
+.confirm-actions .btn-secondary { flex: 1; padding: 10px; }
 
 /* ── カード共通 ───────────────────────────────────────────── */
 .person-card {

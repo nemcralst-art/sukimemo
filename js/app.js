@@ -32,6 +32,9 @@ const S = {
   pendingUrl:      '',
   // ブックマークレット受信結果（画面上部に表示）
   bmResult:        '',
+  // スキ一括確認の確認ダイアログ { ids: [...], label: '...' } | null
+  confirmDialog:   null,
+  likesBulkDate:   '',
 };
 
 // ── ユーティリティ ────────────────────────────────────────────
@@ -68,6 +71,7 @@ async function render() {
     ${S.panel === 'import'   ? await renderImportPanel() : ''}
     ${S.panel === 'settings' ? renderSettingsPanel() : ''}
     ${S.panel === 'export'   ? renderExportPanel() : ''}
+    ${S.confirmDialog ? renderConfirmDialog() : ''}
     <button class="top-btn" id="top-btn" hidden>TOP ↑</button>
   `;
 
@@ -163,6 +167,14 @@ function renderLikesTab(likes) {
         </select>
       </div>` : ''}
     </div>
+    ${S.likesFilter === 'unconfirmed' && unconf.length > 0 ? `
+    <div class="bulk-row">
+      <button class="btn-bulk-confirm" id="btn-likes-bulk-all">全部まとめて確認済みに</button>
+      <div class="bulk-date-row">
+        <input type="date" id="likes-bulk-date" class="bulk-date-input" value="${esc(S.likesBulkDate)}">
+        <button class="btn-bulk-date" id="btn-likes-bulk-date">この日より前を確認済みに</button>
+      </div>
+    </div>` : ''}
     <div id="likes-list">${listHtml}</div>`;
 }
 
@@ -270,6 +282,20 @@ function renderFollowerCard(f) {
           ? `<button class="btn-confirm" data-id="${esc(f.userId)}" data-type="follower">確認済みに</button>`
           : `<button class="btn-revert"  data-id="${esc(f.userId)}" data-type="follower">未確認に戻す</button>`
         }
+      </div>
+    </div>`;
+}
+
+// ── 一括確認ダイアログ ────────────────────────────────────────
+function renderConfirmDialog() {
+  return `
+    <div class="confirm-overlay" id="confirm-overlay">
+      <div class="confirm-box">
+        <p class="confirm-text">${esc(S.confirmDialog.label)}</p>
+        <div class="confirm-actions">
+          <button class="btn-secondary" id="confirm-cancel">やめる</button>
+          <button class="btn-primary"   id="confirm-ok">確認済みにする</button>
+        </div>
       </div>
     </div>`;
 }
@@ -492,6 +518,37 @@ function bindMain(likes, followers) {
     });
     $('likes-sort')?.addEventListener('change', e => { S.likesSort = e.target.value; render(); });
 
+    // 一括確認：全部
+    $('btn-likes-bulk-all')?.addEventListener('click', () => {
+      const ids = likes.filter(l => l.status === 'unconfirmed').map(l => l.id);
+      S.confirmDialog = { ids, label: `未確認のスキ ${ids.length}件をすべて確認済みにします。よろしいですか？` };
+      render();
+    });
+
+    // 一括確認：日付より前
+    $('likes-bulk-date')?.addEventListener('change', e => { S.likesBulkDate = e.target.value; });
+    $('btn-likes-bulk-date')?.addEventListener('click', () => {
+      const dateStr = $('likes-bulk-date')?.value;
+      if (!dateStr) {
+        alert('日付を選んでください');
+        return;
+      }
+      S.likesBulkDate = dateStr;
+      // 選んだ日の0時より前（=その日を含まない）のスキが対象
+      const cutoff = new Date(dateStr + 'T00:00:00');
+      const ids = likes
+        .filter(l => l.status === 'unconfirmed' && l.likedDate && new Date(l.likedDate) < cutoff)
+        .map(l => l.id);
+      if (ids.length === 0) {
+        S.confirmDialog = null;
+        alert('この日より前の未確認のスキはありません');
+        return;
+      }
+      const d = new Date(dateStr);
+      S.confirmDialog = { ids, label: `${d.getMonth()+1}月${d.getDate()}日より前のスキ ${ids.length}件を確認済みにします。よろしいですか？` };
+      render();
+    });
+
     // 確認済みに / 戻す
     document.querySelectorAll('.btn-confirm[data-type="like"]').forEach(btn => {
       btn.addEventListener('click', async () => {
@@ -527,6 +584,20 @@ function bindMain(likes, followers) {
         await db.updateFollowerStatus(btn.dataset.id, 'unconfirmed');
         render();
       });
+    });
+  }
+
+  // 一括確認ダイアログ
+  if (S.confirmDialog) {
+    $('confirm-cancel')?.addEventListener('click', () => { S.confirmDialog = null; render(); });
+    $('confirm-overlay')?.addEventListener('click', e => {
+      if (e.target === $('confirm-overlay')) { S.confirmDialog = null; render(); }
+    });
+    $('confirm-ok')?.addEventListener('click', async () => {
+      const ids = S.confirmDialog.ids;
+      S.confirmDialog = null;
+      await db.confirmLikesByIds(ids);
+      render();
     });
   }
 

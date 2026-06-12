@@ -172,6 +172,26 @@ export async function updateFollowerStatus(userId, status) {
   });
 }
 
+// 指定IDのスキをまとめて確認済みに（1トランザクション・status以外は触らない）
+export async function confirmLikesByIds(ids) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const t = db.transaction('likes', 'readwrite');
+    const store = t.objectStore('likes');
+    ids.forEach(id => {
+      const get = store.get(id);
+      get.onsuccess = () => {
+        if (get.result && get.result.status === 'unconfirmed') {
+          get.result.status = 'confirmed';
+          store.put(get.result);
+        }
+      };
+    });
+    t.oncomplete = () => resolve(ids.length);
+    t.onerror = () => reject(t.error);
+  });
+}
+
 export async function confirmAllFollowers() {
   const all = await getAllFollowers();
   const db = await openDB();
