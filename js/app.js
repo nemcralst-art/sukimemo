@@ -410,41 +410,46 @@ function renderBookmarkletSection() {
         <p class="bm-drag-label">📌 <strong>Mac / PC の方はドラッグするだけ</strong></p>
         <p class="bm-drag-hint">ブックマークバーが見えない場合：Safari「表示」→「ブックマークバーを表示」（⌘⇧B）</p>
         <div class="bm-drag-links">
-          <a class="bm-drag-btn" href="${bmLikes}" onclick="return false" draggable="true">💖 スキを取り込む</a>
-          <a class="bm-drag-btn" href="${bmFoll}"  onclick="return false" draggable="true">👥 フォロワーを取り込む</a>
+          <a class="bm-drag-btn" href="${esc(bmLikes)}" onclick="return false" draggable="true">💖 スキを取り込む</a>
+          <a class="bm-drag-btn" href="${esc(bmFoll)}"  onclick="return false" draggable="true">👥 フォロワーを取り込む</a>
         </div>
         <p class="bm-drag-note">クリックせずに、上の<strong>ブックマークバーへドラッグ</strong>して登録してください</p>
       </div>` : ''}
 
+      ${isMobile ? `
+      <p class="bm-recommend">iPhone でいちばん確実なのは <strong>ショートカット方式</strong>です（Safariのブックマークレットは機種・iOSのバージョンによって弾かれることがあるため）。</p>` : ''}
+
       <details class="bm-howto" ${isMobile ? 'open' : ''}>
-        <summary class="bm-howto-summary">📱 iPhone Safari での登録方法</summary>
+        <summary class="bm-howto-summary">⚡ iPhone ショートカット方式（おすすめ・最も確実）</summary>
         <div class="bm-steps-wrap">
-          <p class="bm-steps-intro">iPhoneではドラッグできません。一度だけコードの貼り付けが必要です。</p>
+          <p class="bm-steps-intro">「ショートカット」アプリ（iPhoneに最初から入っています）に取り込み動作を登録します。一度だけの設定です。</p>
           <ol class="bm-steps">
             <li>下の「コードをコピー」を押す</li>
-            <li>Safari でこのアプリのページを開いたまま、<br>下の共有ボタン（□↑）→「ブックマークを追加」→「保存」</li>
-            <li>画面下の「ブックマーク（本のアイコン）」→ 右下「編集」</li>
-            <li>いま作ったブックマーク（アプリの名前）をタップ</li>
-            <li><strong>URL欄の中身を全部消して</strong>、コピーしたコードを貼り付け → 「完了」</li>
-            <li>次回から：note.com を開いた状態でブックマークをタップするだけ</li>
+            <li>「ショートカット」アプリを開く → 右上「＋」で新規作成</li>
+            <li>「アクションを追加」→ 検索欄に <strong>JavaScript</strong> → 「Webページで JavaScript を実行」を選ぶ</li>
+            <li>アクション内の「JavaScript」と書かれたコード欄をタップ → 全部消して、コピーしたコードを貼り付け</li>
+            <li>上部の名前を「スキ取り込み」などに変更 → 「完了」</li>
+            <li>使うとき：Safari で <strong>note.com を開く</strong> → 共有ボタン（□↑）→ 下の方の「スキ取り込み」をタップ</li>
+            <li>（よく使うなら、ショートカットを長押し →「ホーム画面に追加」でアイコン化も可能）</li>
           </ol>
+          <p class="bm-steps-intro">※ 「Webページで JavaScript を実行」は Safari の共有メニューから実行したときだけ、その note.com ページ上で動きます。</p>
           ${copyRows(bmLikes, bmFoll)}
         </div>
       </details>
 
       <details class="bm-howto">
-        <summary class="bm-howto-summary">⚡ iPhone ショートカット（ホーム画面アイコンで起動できる方法）</summary>
+        <summary class="bm-howto-summary">📱 iPhone Safari ブックマークレット方式（うまくいけば1タップ）</summary>
         <div class="bm-steps-wrap">
-          <p class="bm-steps-intro">ホーム画面に「取り込み」アイコンを置きたい方はこちら。ブックマーク編集と手間は同程度ですが、後の操作がより簡単です。</p>
+          <p class="bm-steps-intro">こちらが動けば、note.com でブックマークを選ぶだけで取り込めます。ただし一部のiOSでは貼り付け時にエラーが出ることがあります（その場合は上のショートカット方式へ）。</p>
           <ol class="bm-steps">
             <li>下の「コードをコピー」を押す</li>
-            <li>「ショートカット」アプリを開く → 右上「＋」→「アクションを追加」</li>
-            <li>検索欄に「JavaScript」と入力 → 「現在の Web ページで JavaScript を実行」を選ぶ</li>
-            <li>アクションのコード欄に貼り付け</li>
-            <li>右上「完了」→ 名前を「スキ取り込み」などに変更</li>
-            <li>ショートカット一覧でそのアイテムを長押し →「ホーム画面に追加」</li>
-            <li>次回から：note.com を Safari で開いた状態でホーム画面のアイコンをタップ</li>
+            <li>Safari で適当なページを開き、共有ボタン（□↑）→「ブックマークを追加」→「保存」</li>
+            <li>画面下の「ブックマーク（本のアイコン）」→ 右下「編集」</li>
+            <li>いま作ったブックマークをタップ</li>
+            <li><strong>URL欄の中身を全部消して</strong>、コピーしたコードを貼り付け → 「完了」</li>
+            <li>使うとき：note.com を開いた状態でブックマーク一覧からタップ</li>
           </ol>
+          <p class="bm-steps-intro">※「JavaScriptは許可されていません」と出たら、この方式は使えない端末です。ショートカット方式をお使いください。</p>
           ${copyRows(bmLikes, bmFoll)}
         </div>
       </details>

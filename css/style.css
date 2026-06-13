@@ -664,6 +664,14 @@ img { display: block; }
   padding: 8px 10px;
 }
 .bm-copy-label { font-size: 13px; color: #2C2C2A; }
+.bm-recommend {
+  background: #EAF3DE;
+  color: #3B6D11;
+  font-size: 12px;
+  line-height: 1.6;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
 
 /* ── 設定パネル ───────────────────────────────────────────── */
 .settings-body { display: flex; flex-direction: column; gap: 20px; }

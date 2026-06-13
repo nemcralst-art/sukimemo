@@ -2,23 +2,34 @@
 // note ID とアプリURLを埋め込んだ完成品コードを返す。
 // note.com 上で動くため fetch がCORSにかからない（同一オリジン）。
 // 取得結果は postMessage でアプリに渡す（localStorageはオリジン別なので使えない）。
+//
+// iOS Safari 対策：
+//  - パーセントエンコードしない（素の javascript: コードでないと弾かれる）
+//  - 改行・コメントを含めない（単一行に最小化）
+//  - window.open は「最初の await より前」に置き、タップのジェスチャー内で実行する
+//    （後回しにするとポップアップがブロックされるため）
 
 function wrap(code) {
-  return 'javascript:' + encodeURIComponent(code);
+  // 連続する空白を1つに圧縮し、エンコードせず素の javascript: にする
+  const min = code.replace(/\s+/g, ' ').trim();
+  return 'javascript:' + min;
 }
 
-// アプリへ payload を送る共通部（ack が返るまで0.4秒間隔で再送）
-function senderCode(appUrl) {
-  const origin = new URL(appUrl).origin;
-  return `var w=window.open('${appUrl}');var done=false;` +
+// アプリ(w)へ payload を送る共通部（ack が返るまで0.4秒間隔で再送）
+function senderCode(origin) {
+  return `var done=false;` +
     `window.addEventListener('message',function(e){if(e.data&&e.data.type==='sukimemo:ack')done=true});` +
-    `var n=0,t=setInterval(function(){if(done||n>75){clearInterval(t);return}n++;` +
-    `try{w.postMessage(payload,'${origin}')}catch(e){}},400);`;
+    `var n=0,t=setInterval(function(){if(done||n>120){clearInterval(t);return}n++;` +
+    `try{if(w)w.postMessage(payload,'${origin}')}catch(e){}},400);`;
 }
 
 export function followersBookmarklet(noteId, appUrl) {
+  const origin = new URL(appUrl).origin;
   const code =
-    `(async()=>{try{` +
+    `(async()=>{` +
+    `var w=window.open('${appUrl}');` +
+    `if(!w){alert('ポップアップがブロックされました。設定でこのサイトのポップアップを許可してください。');return}` +
+    `try{` +
     `var all=[],p=1;` +
     `for(;;){` +
     `var r=await fetch('https://note.com/api/v2/creators/${noteId}/followers?page='+p,{credentials:'include'});` +
@@ -30,15 +41,18 @@ export function followersBookmarklet(noteId, appUrl) {
     `p++;await new Promise(function(s){setTimeout(s,500)})` +
     `}` +
     `var payload={type:'sukimemo:followers',follows:all};` +
-    senderCode(appUrl) +
+    senderCode(origin) +
     `}catch(e){alert('取得できませんでした: '+e.message)}})()`;
   return wrap(code);
 }
 
 export function likesBookmarklet(noteId, appUrl) {
+  const origin = new URL(appUrl).origin;
   const code =
-    `(async()=>{try{` +
-    // ① 自分の記事一覧（key と タイトル）を全ページ取得
+    `(async()=>{` +
+    `var w=window.open('${appUrl}');` +
+    `if(!w){alert('ポップアップがブロックされました。設定でこのサイトのポップアップを許可してください。');return}` +
+    `try{` +
     `var arts=[],p=1;` +
     `for(;;){` +
     `var r=await fetch('https://note.com/api/v2/creators/${noteId}/contents?kind=note&page='+p,{credentials:'include'});` +
@@ -49,7 +63,6 @@ export function likesBookmarklet(noteId, appUrl) {
     `if(last||p>=30)break;` +
     `p++;await new Promise(function(s){setTimeout(s,500)})` +
     `}` +
-    // ② 各記事のスキを取得（ページ送り対応・空になったら終了）
     `var out=[];` +
     `for(var i=0;i<arts.length;i++){` +
     `var a=arts[i];if(!a.key)continue;` +
@@ -69,7 +82,7 @@ export function likesBookmarklet(noteId, appUrl) {
     `await new Promise(function(s){setTimeout(s,500)})` +
     `}` +
     `var payload={type:'sukimemo:likes',articles:out};` +
-    senderCode(appUrl) +
+    senderCode(origin) +
     `}catch(e){alert('取得できませんでした: '+e.message)}})()`;
   return wrap(code);
 }
