@@ -401,8 +401,7 @@ function renderBookmarkletSection() {
   return `
     <div class="import-section">
       <p class="import-desc">
-        一度だけ登録すれば、<strong>note.com を開いてブックマークを1タップ</strong>するだけで、
-        全ページぶんをまとめて取り込めます（コピペ・ページ送り不要）。
+        一度だけ登録すれば、次からは<strong>note.com でボタンを1回押すだけ</strong>で、スキもフォロワーも全部まとめて取り込めます。
       </p>
 
       ${!isMobile ? `
@@ -428,7 +427,7 @@ function renderBookmarkletSection() {
             <li>「ショートカット」アプリを開く → 右上「＋」で新規作成</li>
             <li>「アクションを追加」→ 検索欄に <strong>JavaScript</strong> → 「Webページで JavaScript を実行」を選ぶ</li>
             <li>アクション内の「JavaScript」と書かれたコード欄をタップ → 全部消して、コピーしたコードを貼り付け</li>
-            <li>上部の名前を「スキ取り込み」などに変更 → 「完了」</li>
+            <li>画面上部の <strong>∨（下向き矢印）</strong> をタップ → 名前を「スキ取り込み」などに変更 → 「完了」</li>
             <li>使うとき：Safari で <strong>note.com を開く</strong> → 共有ボタン（□↑）→ 下の方の「スキ取り込み」をタップ</li>
             <li>（よく使うなら、ショートカットを長押し →「ホーム画面に追加」でアイコン化も可能）</li>
           </ol>
