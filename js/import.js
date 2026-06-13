@@ -92,6 +92,83 @@ export function likesFromRaw(rawLikes, noteKey, articleTitle, articleUrl) {
     .filter(Boolean);
 }
 
+// ── iOSショートカット方式：まとめて貼り付けたテキストを解析 ──────
+// ショートカットは「APIの生レスポンスを区切り文字でつないだだけ」を出力する。
+// 整形・解析はすべてここ（アプリ側）に寄せて、ショートカットを単純に保つ。
+//
+// フォロワー用の出力形式：
+//   SUKIMEMO_FOLLOWERS
+//   <followers?page=1 のレスポンスJSON>
+//   @@@
+//   <followers?page=2 のレスポンスJSON>
+//   @@@ ...
+//
+// スキ用の出力形式：
+//   SUKIMEMO_LIKES
+//   @@KEY@@<記事key>@@TITLE@@<記事タイトル>
+//   <その記事の likes レスポンスJSON>
+//   @@@ ...
+const SC_SEP = '@@@';
+
+export function parseShortcutBundle(text) {
+  const t = (text ?? '').trim();
+  if (/^SUKIMEMO_FOLLOWERS/.test(t)) {
+    return parseFollowerBundle(t.replace(/^SUKIMEMO_FOLLOWERS/, ''));
+  }
+  if (/^SUKIMEMO_LIKES/.test(t)) {
+    return parseLikesBundle(t.replace(/^SUKIMEMO_LIKES/, ''));
+  }
+  return null; // ショートカット出力ではない
+}
+
+function parseFollowerBundle(body) {
+  let all = [];
+  for (const block of body.split(SC_SEP)) {
+    const s = block.trim();
+    if (!s) continue;
+    let data;
+    try { data = JSON.parse(s); } catch { continue; } // 壊れた/空ページは無視
+    const users = data?.data?.follows ?? data?.follows ?? null;
+    if (Array.isArray(users) && users.length) {
+      all = all.concat(followersFromRaw(users));
+    }
+  }
+  // 同一ユーザーの重複を除去（ページ境界での重複対策）
+  const map = new Map();
+  for (const f of all) if (!map.has(f.userId)) map.set(f.userId, f);
+  const followers = [...map.values()];
+  if (!followers.length) {
+    throw new Error('フォロワーが見つかりませんでした。ショートカットをもう一度実行してから貼り付けてください。');
+  }
+  return { type: 'followers', followers };
+}
+
+function parseLikesBundle(body) {
+  const articles = [];
+  for (const block of body.split(SC_SEP)) {
+    const s = block.trim();
+    if (!s) continue;
+    // 先頭行のマーカーから記事key・タイトルを取り出す
+    const m = s.match(/^@@KEY@@(.*?)@@TITLE@@(.*?)\r?\n([\s\S]*)$/);
+    if (!m) continue;
+    const key = m[1].trim();
+    const title = m[2].trim();
+    const json = m[3].trim();
+    if (!key) continue;
+    let data;
+    try { data = JSON.parse(json); } catch { continue; }
+    const rawLikes = data?.data?.likes ?? data?.likes ?? [];
+    if (!Array.isArray(rawLikes)) continue;
+    const url = `https://note.com/n/${key}`;
+    const likes = likesFromRaw(rawLikes, key, title || key, url);
+    articles.push({ key, title: title || key, url, likes });
+  }
+  if (!articles.length) {
+    throw new Error('スキが見つかりませんでした。ショートカットをもう一度実行してから貼り付けてください。');
+  }
+  return { type: 'likes', articles };
+}
+
 // URLまたは入力文字列からnoteKeyを抽出
 export function extractNoteKey(input) {
   const s = (input ?? '').trim();

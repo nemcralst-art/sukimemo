@@ -1,6 +1,5 @@
 import * as db from './db.js';
-import { parseFollowersJSON, parseLikesJSON, extractNoteKey, followersFromRaw, likesFromRaw } from './import.js';
-import { followersBookmarklet, likesBookmarklet } from './bookmarklet.js';
+import { parseFollowersJSON, parseLikesJSON, extractNoteKey, followersFromRaw, likesFromRaw, parseShortcutBundle } from './import.js';
 
 // ── アプリ名（1箇所で管理） ───────────────────────────────────
 const APP_NAME = 'スキめも';
@@ -387,103 +386,83 @@ async function renderImportPanel() {
     </div>`;
 }
 
-// ── ブックマークレット（かんたん取込） ────────────────────────
-function appUrl() {
-  // index.html を含まない正規のアプリURL
-  return location.origin + location.pathname.replace(/index\.html$/, '');
-}
-
+// ── ショートカット方式（かんたん取込） ────────────────────────
 function renderBookmarkletSection() {
-  const bmLikes = likesBookmarklet(S.noteId, appUrl());
-  const bmFoll  = followersBookmarklet(S.noteId, appUrl());
-  const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
+  const id = S.noteId;
+  const followUrl   = `https://note.com/api/v2/creators/${id}/followers?page=`;
+  const contentsUrl = `https://note.com/api/v2/creators/${id}/contents?kind=note&page=1`;
+  const likesUrl    = `https://note.com/api/v3/notes/記事key/likes?page=1`;
 
   return `
     <div class="import-section">
       <p class="import-desc">
-        一度だけ登録すれば、次からは<strong>note.com でボタンを1回押すだけ</strong>で、スキもフォロワーも全部まとめて取り込めます。
+        iPhoneだけで完結する方法です。<strong>「ショートカット」アプリ</strong>に取り込み動作を一度だけ登録すれば、
+        次からは<strong>ボタン1つでスキ・フォロワーを全ページまとめて取得</strong>し、ここに貼り付けるだけで取り込めます。
+        （Safariもnoteアプリも経由しないので、noteアプリが入っていても影響を受けません）
       </p>
 
-      ${!isMobile ? `
-      <div class="bm-drag-box">
-        <p class="bm-drag-label">📌 <strong>Mac / PC の方はドラッグするだけ</strong></p>
-        <p class="bm-drag-hint">ブックマークバーが見えない場合：Safari「表示」→「ブックマークバーを表示」（⌘⇧B）</p>
-        <div class="bm-drag-links">
-          <a class="bm-drag-btn" href="${esc(bmLikes)}" onclick="return false" draggable="true">💖 スキを取り込む</a>
-          <a class="bm-drag-btn" href="${esc(bmFoll)}"  onclick="return false" draggable="true">👥 フォロワーを取り込む</a>
-        </div>
-        <p class="bm-drag-note">クリックせずに、上の<strong>ブックマークバーへドラッグ</strong>して登録してください</p>
-      </div>` : ''}
+      <div class="sc-paste-box">
+        <p class="sc-paste-label">📥 ショートカットでコピーした内容をここに貼り付け</p>
+        <textarea id="paste-shortcut" class="paste-area" placeholder="ショートカットを実行 →「コピー」された内容をここに貼り付け"></textarea>
+        <button class="btn-primary btn-wide" id="btn-import-shortcut">取り込む</button>
+        ${S.importMsg && S.importTab==='bookmarklet'
+          ? `<p class="import-result ${S.importMsgOk?'ok':'err'}">${esc(S.importMsg)}</p>` : ''}
+      </div>
 
-      ${isMobile ? `
-      <p class="bm-recommend">iPhone でいちばん確実なのは <strong>ショートカット方式</strong>です（Safariのブックマークレットは機種・iOSのバージョンによって弾かれることがあるため）。</p>` : ''}
+      <p class="bm-recommend">▼ はじめての方は、まず下の2つのショートカットを作ってください（一度だけの設定です）。</p>
 
-      <details class="bm-howto" ${isMobile ? 'open' : ''}>
-        <summary class="bm-howto-summary">⚡ iPhone ショートカット方式（おすすめ・最も確実）</summary>
+      <details class="bm-howto" open>
+        <summary class="bm-howto-summary">👥 ① フォロワー取り込みショートカットの作り方</summary>
         <div class="bm-steps-wrap">
-          <p class="bm-steps-intro">「ショートカット」アプリ（iPhoneに最初から入っています）に取り込み動作を登録します。一度だけの設定です。</p>
+          <p class="bm-steps-intro">「ショートカット」アプリ（iPhoneに最初から入っています）を開き、右上「＋」で新規作成して、次のアクションを上から順に追加します。</p>
           <ol class="bm-steps">
-            <li>下の「コードをコピー」を押す</li>
-            <li>「ショートカット」アプリを開く → 右上「＋」で新規作成</li>
-            <li>「アクションを追加」→ 検索欄に <strong>JavaScript</strong> → 「Webページで JavaScript を実行」を選ぶ</li>
-            <li>アクション内の「JavaScript」と書かれたコード欄をタップ → 全部消して、コピーしたコードを貼り付け</li>
-            <li>画面上部の <strong>∨（下向き矢印）</strong> をタップ → 名前を「スキ取り込み」などに変更 → 「完了」</li>
-            <li>使うとき：Safari で <strong>note.com を開く</strong> → 共有ボタン（□↑）→ 下の方の「スキ取り込み」をタップ</li>
-            <li>（よく使うなら、ショートカットを長押し →「ホーム画面に追加」でアイコン化も可能）</li>
+            <li><strong>「テキスト」</strong>アクションを追加 → 内容に <code>SUKIMEMO_FOLLOWERS</code> と入力</li>
+            <li><strong>「変数を設定」</strong>を追加 → 変数名を <code>結果</code> にする（入力は「テキスト」を指定）</li>
+            <li><strong>「繰り返す」</strong>を追加 → 回数を <strong>20</strong> にする（※フォロワーが2000人以上なら回数を増やす）</li>
+            <li>「繰り返す」の<strong>中に</strong>「URLの内容を取得」を追加 → URL欄に下のフォロワーURLを貼り付け、<strong>末尾に「繰り返しインデックス」変数</strong>を入れる
+              <div class="sc-url-row"><code class="sc-url">${esc(followUrl)}</code><button class="btn-secondary sc-copy" data-copy="${esc(followUrl)}">URLをコピー</button></div>
+            </li>
+            <li>続けて<strong>中に</strong>「テキスト」を追加 → 内容を <code>［結果］⏎@@@⏎［URLの内容］</code> にする（［ ］は変数。改行を挟む）</li>
+            <li>続けて<strong>中に</strong>「変数を設定」を追加 → 変数 <code>結果</code> に、いまの「テキスト」を入れる</li>
+            <li>「繰り返す」の<strong>外（下）</strong>に「クリップボードにコピー」を追加 → <code>結果</code> を指定</li>
+            <li>上部の <strong>∨（下向き矢印）</strong> → 名前を「フォロワー取り込み」にして「完了」</li>
           </ol>
-          <p class="bm-steps-intro">※ 「Webページで JavaScript を実行」は Safari の共有メニューから実行したときだけ、その note.com ページ上で動きます。</p>
-          ${copyRows(bmLikes, bmFoll)}
+          <p class="bm-steps-intro">使うとき：このショートカットを実行 → 自動でコピーされるので、上の貼り付け欄に貼って「取り込む」。</p>
         </div>
       </details>
 
       <details class="bm-howto">
-        <summary class="bm-howto-summary">📱 iPhone Safari ブックマークレット方式（うまくいけば1タップ）</summary>
+        <summary class="bm-howto-summary">💖 ② スキ取り込みショートカットの作り方</summary>
         <div class="bm-steps-wrap">
-          <p class="bm-steps-intro">こちらが動けば、note.com でブックマークを選ぶだけで取り込めます。ただし一部のiOSでは貼り付け時にエラーが出ることがあります（その場合は上のショートカット方式へ）。</p>
+          <p class="bm-steps-intro">同じく「ショートカット」アプリで新規作成し、上から順に追加します。少し長いですが一度だけです。</p>
           <ol class="bm-steps">
-            <li>下の「コードをコピー」を押す</li>
-            <li>Safari で適当なページを開き、共有ボタン（□↑）→「ブックマークを追加」→「保存」</li>
-            <li>画面下の「ブックマーク（本のアイコン）」→ 右下「編集」</li>
-            <li>いま作ったブックマークをタップ</li>
-            <li><strong>URL欄の中身を全部消して</strong>、コピーしたコードを貼り付け → 「完了」</li>
-            <li>使うとき：note.com を開いた状態でブックマーク一覧からタップ</li>
+            <li><strong>「テキスト」</strong>→ 内容に <code>SUKIMEMO_LIKES</code></li>
+            <li><strong>「変数を設定」</strong>→ 変数 <code>結果</code></li>
+            <li><strong>「URLの内容を取得」</strong>→ URL欄に下の記事一覧URLを貼り付け
+              <div class="sc-url-row"><code class="sc-url">${esc(contentsUrl)}</code><button class="btn-secondary sc-copy" data-copy="${esc(contentsUrl)}">URLをコピー</button></div>
+            </li>
+            <li><strong>「辞書の値を取得」</strong>→ 取得するキーに <code>data.contents</code>、入力は「URLの内容」</li>
+            <li><strong>「繰り返す（各項目）」</strong>を追加 → 上の「辞書の値」を対象にする</li>
+            <li>中に<strong>「辞書の値を取得」</strong>→ キー <code>key</code>、入力は「繰り返し項目」→ 続けて「変数を設定」で <code>キー</code> に保存</li>
+            <li>中に<strong>「辞書の値を取得」</strong>→ キー <code>name</code>、入力は「繰り返し項目」→ 続けて「変数を設定」で <code>タイトル</code> に保存</li>
+            <li>中に<strong>「URLの内容を取得」</strong>→ URLを下の形にする（<code>記事key</code> の所に変数 <code>キー</code> を入れる）
+              <div class="sc-url-row"><code class="sc-url">${esc(likesUrl)}</code><button class="btn-secondary sc-copy" data-copy="${esc(likesUrl)}">URLをコピー</button></div>
+            </li>
+            <li>中に<strong>「テキスト」</strong>→ 内容を <code>［結果］⏎@@KEY@@［キー］@@TITLE@@［タイトル］⏎［URLの内容］⏎@@@</code></li>
+            <li>中に<strong>「変数を設定」</strong>→ 変数 <code>結果</code> に、いまの「テキスト」を入れる</li>
+            <li>繰り返しの<strong>外（下）</strong>に「クリップボードにコピー」→ <code>結果</code></li>
+            <li>上部の <strong>∨</strong> → 名前を「スキ取り込み」にして「完了」</li>
           </ol>
-          <p class="bm-steps-intro">※「JavaScriptは許可されていません」と出たら、この方式は使えない端末です。ショートカット方式をお使いください。</p>
-          ${copyRows(bmLikes, bmFoll)}
+          <p class="bm-steps-intro">※ 記事が25本以上ある場合は、手順3のURL末尾 <code>page=1</code> を <code>page=2</code> にしたショートカットも作ると残りも取れます。</p>
         </div>
       </details>
 
-      ${!isMobile ? `
       <details class="bm-howto">
-        <summary class="bm-howto-summary">📖 Mac Safari でコードを貼って登録する方法（ドラッグが難しい場合）</summary>
+        <summary class="bm-howto-summary">🛟 保険：ショートカットが作れない時（Safariでコピペ）</summary>
         <div class="bm-steps-wrap">
-          <ol class="bm-steps">
-            <li>下の「コードをコピー」を押す</li>
-            <li>Safari で ⌘D → 名前を「スキ取り込み」などにして保存</li>
-            <li>メニュー「ブックマーク」→「ブックマークを編集」</li>
-            <li>いま作ったブックマークを右クリック → 「アドレスを編集」</li>
-            <li>URL欄の中身を全部消して、コードを貼り付け → Enter</li>
-          </ol>
-          ${copyRows(bmLikes, bmFoll)}
+          <p class="bm-steps-intro">上のタブ「スキ」「フォロワー」から、1ページずつ確実に取り込めます。Safariのアドレスバーで直接JSONを開く方式なので、必ず動きます（ページ送りは手動）。</p>
         </div>
-      </details>` : ''}
-
-      <p class="import-desc">
-        ※ 取り込みが完了すると、このアプリが新しいタブで開いて自動保存されます。<br>
-        ※ note ID やアプリのURLが変わったときだけ、登録し直しが必要です。
-      </p>
-    </div>`;
-}
-
-function copyRows(bmLikes, bmFoll) {
-  return `
-    <div class="bm-copy-row">
-      <span class="bm-copy-label">💖 スキ用</span>
-      <button class="btn-secondary bm-copy" data-code="${esc(bmLikes)}">コードをコピー</button>
-    </div>
-    <div class="bm-copy-row">
-      <span class="bm-copy-label">👥 フォロワー用</span>
-      <button class="btn-secondary bm-copy" data-code="${esc(bmFoll)}">コードをコピー</button>
+      </details>
     </div>`;
 }
 
@@ -719,18 +698,53 @@ function bindMain(likes, followers) {
 
 // ── インポートパネルのバインド ────────────────────────────────
 function bindImportPanel() {
-  // ブックマークレットのコードコピー
-  document.querySelectorAll('.bm-copy').forEach(btn => {
+  // ショートカット用URLのコピー
+  document.querySelectorAll('.sc-copy').forEach(btn => {
+    const orig = btn.textContent;
     btn.addEventListener('click', async () => {
       try {
-        await navigator.clipboard.writeText(btn.dataset.code);
-        btn.textContent = 'コピーしました ✓';
-        setTimeout(() => { btn.textContent = 'コードをコピー'; }, 2000);
+        await navigator.clipboard.writeText(btn.dataset.copy);
+        btn.textContent = 'コピー✓';
+        setTimeout(() => { btn.textContent = orig; }, 2000);
       } catch {
-        // クリップボードが使えない環境向けのフォールバック
-        prompt('下のコードを全選択してコピーしてください', btn.dataset.code);
+        prompt('下を全選択してコピーしてください', btn.dataset.copy);
       }
     });
+  });
+
+  // ショートカットから貼り付けた内容を取り込む（フォロワー/スキ 自動判別）
+  $('btn-import-shortcut')?.addEventListener('click', async () => {
+    const text = $('paste-shortcut')?.value.trim() ?? '';
+    if (!text) { setImportMsg('ショートカットでコピーした内容を貼り付けてください', false); return; }
+    let parsed;
+    try { parsed = parseShortcutBundle(text); }
+    catch (err) { setImportMsg(err.message, false); return; }
+    if (!parsed) {
+      setImportMsg('ショートカットの内容ではないようです。ショートカットを実行してから貼り付けてください。', false);
+      return;
+    }
+    try {
+      if (parsed.type === 'followers') {
+        const added = await db.upsertFollowersNew(parsed.followers, true);
+        setImportMsg(`フォロワーを取り込みました：新規 ${added}人（全${parsed.followers.length}人を確認）`, true);
+        S.tab = 'followers';
+      } else {
+        let totalAdded = 0, totalSeen = 0;
+        for (const art of parsed.articles) {
+          totalSeen += art.likes.length;
+          totalAdded += await db.upsertLikesNew(art.likes);
+          await db.upsertArticle({
+            noteKey: art.key, title: art.title, url: art.url,
+            lastImported: new Date().toISOString(),
+          });
+        }
+        setImportMsg(`スキを取り込みました：新規 ${totalAdded}件（${parsed.articles.length}記事・全${totalSeen}件を確認）`, true);
+        S.tab = 'likes';
+      }
+      $('paste-shortcut').value = '';
+    } catch (err) {
+      setImportMsg(err.message, false);
+    }
   });
 
   // フォロワー：開く
