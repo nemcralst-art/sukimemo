@@ -389,7 +389,8 @@ async function renderImportPanel() {
 // ── ショートカット方式（かんたん取込） ────────────────────────
 function renderBookmarkletSection() {
   const id = S.noteId;
-  const followUrl   = `https://note.com/api/v2/creators/${id}/followers?page=1`;
+  const followUrls  = [1,2,3,4,5].map(p =>
+    `https://note.com/api/v2/creators/${id}/followers?page=${p}`);
   const contentsUrl = `https://note.com/api/v2/creators/${id}/contents?kind=note&page=1`;
   const likesUrl    = `https://note.com/api/v3/notes/キー/likes?page=1`;
 
@@ -413,18 +414,33 @@ function renderBookmarkletSection() {
         ※ iCloudの共有リンクでの配布はできないため、お手数ですが手順に沿って作成をお願いします。</p>
 
       <details class="bm-howto" open>
-        <summary class="bm-howto-summary">👥 ① フォロワー取り込み（かんたん・2ステップ）</summary>
+        <summary class="bm-howto-summary">👥 ① フォロワー取り込み（7ステップ・変数なし）</summary>
         <div class="bm-steps-wrap">
-          <p class="bm-steps-intro">「ショートカット」アプリを開き、右上「＋」で新規作成。たった2つのアクションだけです。</p>
+          <p class="bm-steps-intro">「ショートカット」アプリを開き、右上「＋」で新規作成。ループも変数も辞書も使いません。同じ種類のアクションを並べるだけです。</p>
           <ol class="bm-steps">
-            <li><strong>「URLの内容を取得」</strong>を追加 → URL欄に下を貼り付け
-              <div class="sc-url-row"><code class="sc-url">${esc(followUrl)}</code><button class="btn-secondary sc-copy" data-copy="${esc(followUrl)}">URLをコピー</button></div>
+            <li>「URLの内容を取得」を追加 → URL欄に下の <strong>page=1</strong> を貼り付け
+              <div class="sc-url-row"><code class="sc-url">${esc(followUrls[0])}</code><button class="btn-secondary sc-copy" data-copy="${esc(followUrls[0])}">コピー</button></div>
             </li>
-            <li><strong>「クリップボードにコピー」</strong>を追加（そのままでOK）</li>
-            <li>上部の <strong>∨（下向き矢印）</strong> → 名前を「フォロワー取り込み」にして「完了」</li>
+            <li>さらに「URLの内容を取得」を追加 → <strong>page=2</strong>
+              <div class="sc-url-row"><code class="sc-url">${esc(followUrls[1])}</code><button class="btn-secondary sc-copy" data-copy="${esc(followUrls[1])}">コピー</button></div>
+            </li>
+            <li>さらに「URLの内容を取得」を追加 → <strong>page=3</strong>
+              <div class="sc-url-row"><code class="sc-url">${esc(followUrls[2])}</code><button class="btn-secondary sc-copy" data-copy="${esc(followUrls[2])}">コピー</button></div>
+            </li>
+            <li>さらに「URLの内容を取得」を追加 → <strong>page=4</strong>
+              <div class="sc-url-row"><code class="sc-url">${esc(followUrls[3])}</code><button class="btn-secondary sc-copy" data-copy="${esc(followUrls[3])}">コピー</button></div>
+            </li>
+            <li>さらに「URLの内容を取得」を追加 → <strong>page=5</strong>
+              <div class="sc-url-row"><code class="sc-url">${esc(followUrls[4])}</code><button class="btn-secondary sc-copy" data-copy="${esc(followUrls[4])}">コピー</button></div>
+            </li>
+            <li>「テキスト」を追加 → 内容欄に、手順1〜5のそれぞれの「URLの内容」マジック変数を入れて、間を <code>@@@</code> でつなぐ<br>
+              <small>（テキスト欄をタップ → 変数ボタン → 「URLの内容」から選ぶ。5個ぶん繰り返す）</small><br>
+              最終的な内容のイメージ：<code>[1の内容]@@@[2の内容]@@@[3の内容]@@@[4の内容]@@@[5の内容]</code></li>
+            <li>「クリップボードにコピー」を追加（そのままでOK）</li>
           </ol>
-          <p class="bm-steps-intro">使うとき：このショートカットを実行 → 自動でコピーされるので、上の貼り付け欄に貼って「取り込む」だけ。<br>
-            ※ 最新ページのフォロワーを取得します（＝新しく増えた人がわかればOK、という前提）。</p>
+          <p class="bm-steps-intro">∨（下向き矢印）→ 名前を「フォロワー取り込み」にして「完了」。<br>
+            使うとき：ショートカットを実行 → コピーされたら上の貼り付け欄に貼って「取り込む」。<br>
+            5ページ＝最大60人ぶん。重複は自動スキップ、空ページは自動無視です。</p>
         </div>
       </details>
 

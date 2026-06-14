@@ -126,8 +126,10 @@ export function parseShortcutBundle(text) {
   if (/^SUKIMEMO_LIKES/.test(t)) {
     return parseLikesBundle(t.replace(/^SUKIMEMO_LIKES/, ''));
   }
-  // ヘッダーは無いが @@KEY@@ マーカーがある＝スキバンドル
-  if (t.includes('@@KEY@@')) {
+  // @@@で複数JSONが連結されている → フォロワー多ページ（変数なし5並べ方式）
+  if (t.includes(SC_SEP) && !t.includes('@@KEY@@')) {
+    return parseFollowerBundle(t);
+  }
     return parseLikesBundle(t);
   }
 
