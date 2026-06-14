@@ -103,22 +103,61 @@ export function likesFromRaw(rawLikes, noteKey, articleTitle, articleUrl) {
 //   <followers?page=2 のレスポンスJSON>
 //   @@@ ...
 //
-// スキ用の出力形式：
+// スキ用の出力形式（タイトルは省略可。アプリ側が記事一覧から補う）：
 //   SUKIMEMO_LIKES
-//   @@KEY@@<記事key>@@TITLE@@<記事タイトル>
+//   @@KEY@@<記事key>
 //   <その記事の likes レスポンスJSON>
 //   @@@ ...
+//
+// さらに、ヘッダー無しの「生レスポンスJSONそのまま」も受け取れる：
+//   {data:{follows:[...]}}   → フォロワー
+//   {data:{contents:[...]}}  → 記事一覧（タイトル登録用）
+// これにより、フォロワー取得は「URLの内容を取得＋コピー」の2アクションで済む。
 const SC_SEP = '@@@';
 
 export function parseShortcutBundle(text) {
   const t = (text ?? '').trim();
+  if (!t) return null;
+
+  // 1) 明示ヘッダー付きバンドル
   if (/^SUKIMEMO_FOLLOWERS/.test(t)) {
     return parseFollowerBundle(t.replace(/^SUKIMEMO_FOLLOWERS/, ''));
   }
   if (/^SUKIMEMO_LIKES/.test(t)) {
     return parseLikesBundle(t.replace(/^SUKIMEMO_LIKES/, ''));
   }
-  return null; // ショートカット出力ではない
+  // ヘッダーは無いが @@KEY@@ マーカーがある＝スキバンドル
+  if (t.includes('@@KEY@@')) {
+    return parseLikesBundle(t);
+  }
+
+  // 2) 生のJSONレスポンスをそのまま貼り付けた場合（2アクション運用）
+  if (t[0] === '{' || t[0] === '[') {
+    let data;
+    try { data = JSON.parse(t); } catch {
+      throw new Error('内容を読み取れませんでした。ショートカットを実行してコピーした内容をそのまま貼り付けてください。');
+    }
+    const d = data?.data ?? data;
+    if (Array.isArray(d?.follows)) {
+      return { type: 'followers', followers: dedupeFollowers(followersFromRaw(d.follows)) };
+    }
+    if (Array.isArray(d?.contents)) {
+      return { type: 'articles', articles: articlesFromRaw(d.contents) };
+    }
+    if (Array.isArray(d?.likes)) {
+      // 生のスキJSON単体は、どの記事か分からないので取り込めない
+      throw new Error('この内容だけではどの記事のスキか分かりません。スキは専用ショートカット（@@KEY@@付き）から取り込んでください。');
+    }
+    throw new Error('フォロワー／記事一覧のデータが見つかりませんでした。URLが正しいか確認してください。');
+  }
+
+  return null; // 取り込み対象ではない
+}
+
+function dedupeFollowers(list) {
+  const map = new Map();
+  for (const f of list) if (!map.has(f.userId)) map.set(f.userId, f);
+  return [...map.values()];
 }
 
 function parseFollowerBundle(body) {
@@ -133,10 +172,7 @@ function parseFollowerBundle(body) {
       all = all.concat(followersFromRaw(users));
     }
   }
-  // 同一ユーザーの重複を除去（ページ境界での重複対策）
-  const map = new Map();
-  for (const f of all) if (!map.has(f.userId)) map.set(f.userId, f);
-  const followers = [...map.values()];
+  const followers = dedupeFollowers(all);
   if (!followers.length) {
     throw new Error('フォロワーが見つかりませんでした。ショートカットをもう一度実行してから貼り付けてください。');
   }
@@ -148,11 +184,11 @@ function parseLikesBundle(body) {
   for (const block of body.split(SC_SEP)) {
     const s = block.trim();
     if (!s) continue;
-    // 先頭行のマーカーから記事key・タイトルを取り出す
-    const m = s.match(/^@@KEY@@(.*?)@@TITLE@@(.*?)\r?\n([\s\S]*)$/);
+    // 先頭行のマーカーから記事key（＋あればタイトル）を取り出す
+    const m = s.match(/^@@KEY@@([^\n@]*?)(?:@@TITLE@@([^\n]*?))?\r?\n([\s\S]*)$/);
     if (!m) continue;
     const key = m[1].trim();
-    const title = m[2].trim();
+    const title = (m[2] ?? '').trim(); // 省略可：空ならアプリ側で補完
     const json = m[3].trim();
     if (!key) continue;
     let data;
@@ -161,12 +197,27 @@ function parseLikesBundle(body) {
     if (!Array.isArray(rawLikes)) continue;
     const url = `https://note.com/n/${key}`;
     const likes = likesFromRaw(rawLikes, key, title || key, url);
-    articles.push({ key, title: title || key, url, likes });
+    articles.push({ key, title, url, likes }); // title は空のことがある
   }
   if (!articles.length) {
     throw new Error('スキが見つかりませんでした。ショートカットをもう一度実行してから貼り付けてください。');
   }
   return { type: 'likes', articles };
+}
+
+// 生の記事一覧（contents）→ {key,title,url}
+export function articlesFromRaw(contents) {
+  return contents
+    .map(c => {
+      const key = c.key ?? c.id ?? '';
+      if (!key) return null;
+      return {
+        key: String(key),
+        title: c.name ?? c.title ?? String(key),
+        url: c.noteUrl ?? c.note_url ?? `https://note.com/n/${key}`,
+      };
+    })
+    .filter(Boolean);
 }
 
 // URLまたは入力文字列からnoteKeyを抽出

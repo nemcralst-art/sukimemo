@@ -389,16 +389,16 @@ async function renderImportPanel() {
 // ── ショートカット方式（かんたん取込） ────────────────────────
 function renderBookmarkletSection() {
   const id = S.noteId;
-  const followUrl   = `https://note.com/api/v2/creators/${id}/followers?page=`;
+  const followUrl   = `https://note.com/api/v2/creators/${id}/followers?page=1`;
   const contentsUrl = `https://note.com/api/v2/creators/${id}/contents?kind=note&page=1`;
-  const likesUrl    = `https://note.com/api/v3/notes/記事key/likes?page=1`;
+  const likesUrl    = `https://note.com/api/v3/notes/キー/likes?page=1`;
 
   return `
     <div class="import-section">
       <p class="import-desc">
         iPhoneだけで完結する方法です。<strong>「ショートカット」アプリ</strong>に取り込み動作を一度だけ登録すれば、
-        次からは<strong>ボタン1つでスキ・フォロワーを全ページまとめて取得</strong>し、ここに貼り付けるだけで取り込めます。
-        （Safariもnoteアプリも経由しないので、noteアプリが入っていても影響を受けません）
+        次からは<strong>ボタン1つで取得</strong>して、ここに貼り付けるだけで取り込めます。
+        （Safariもnoteアプリも経由しないので、noteアプリが入っていても大丈夫です）
       </p>
 
       <div class="sc-paste-box">
@@ -409,56 +409,66 @@ function renderBookmarkletSection() {
           ? `<p class="import-result ${S.importMsgOk?'ok':'err'}">${esc(S.importMsg)}</p>` : ''}
       </div>
 
-      <p class="bm-recommend">▼ はじめての方は、まず下の2つのショートカットを作ってください（一度だけの設定です）。</p>
+      <p class="bm-recommend">▼ はじめに、下のショートカットを作ってください（一度だけの設定です）。<br>
+        ※ iCloudの共有リンクでの配布はできないため、お手数ですが手順に沿って作成をお願いします。</p>
 
       <details class="bm-howto" open>
-        <summary class="bm-howto-summary">👥 ① フォロワー取り込みショートカットの作り方</summary>
+        <summary class="bm-howto-summary">👥 ① フォロワー取り込み（かんたん・2ステップ）</summary>
         <div class="bm-steps-wrap">
-          <p class="bm-steps-intro">「ショートカット」アプリ（iPhoneに最初から入っています）を開き、右上「＋」で新規作成して、次のアクションを上から順に追加します。</p>
+          <p class="bm-steps-intro">「ショートカット」アプリを開き、右上「＋」で新規作成。たった2つのアクションだけです。</p>
           <ol class="bm-steps">
-            <li><strong>「テキスト」</strong>アクションを追加 → 内容に <code>SUKIMEMO_FOLLOWERS</code> と入力</li>
-            <li><strong>「変数を設定」</strong>を追加 → 変数名を <code>結果</code> にする（入力は「テキスト」を指定）</li>
-            <li><strong>「繰り返す」</strong>を追加 → 回数を <strong>20</strong> にする（※フォロワーが2000人以上なら回数を増やす）</li>
-            <li>「繰り返す」の<strong>中に</strong>「URLの内容を取得」を追加 → URL欄に下のフォロワーURLを貼り付け、<strong>末尾に「繰り返しインデックス」変数</strong>を入れる
+            <li><strong>「URLの内容を取得」</strong>を追加 → URL欄に下を貼り付け
               <div class="sc-url-row"><code class="sc-url">${esc(followUrl)}</code><button class="btn-secondary sc-copy" data-copy="${esc(followUrl)}">URLをコピー</button></div>
             </li>
-            <li>続けて<strong>中に</strong>「テキスト」を追加 → 内容を <code>［結果］⏎@@@⏎［URLの内容］</code> にする（［ ］は変数。改行を挟む）</li>
-            <li>続けて<strong>中に</strong>「変数を設定」を追加 → 変数 <code>結果</code> に、いまの「テキスト」を入れる</li>
-            <li>「繰り返す」の<strong>外（下）</strong>に「クリップボードにコピー」を追加 → <code>結果</code> を指定</li>
+            <li><strong>「クリップボードにコピー」</strong>を追加（そのままでOK）</li>
             <li>上部の <strong>∨（下向き矢印）</strong> → 名前を「フォロワー取り込み」にして「完了」</li>
           </ol>
-          <p class="bm-steps-intro">使うとき：このショートカットを実行 → 自動でコピーされるので、上の貼り付け欄に貼って「取り込む」。</p>
+          <p class="bm-steps-intro">使うとき：このショートカットを実行 → 自動でコピーされるので、上の貼り付け欄に貼って「取り込む」だけ。<br>
+            ※ 最新ページのフォロワーを取得します（＝新しく増えた人がわかればOK、という前提）。</p>
         </div>
       </details>
 
       <details class="bm-howto">
-        <summary class="bm-howto-summary">💖 ② スキ取り込みショートカットの作り方</summary>
+        <summary class="bm-howto-summary">📄 ② 記事一覧の登録（かんたん・2ステップ／最初に1回）</summary>
         <div class="bm-steps-wrap">
-          <p class="bm-steps-intro">同じく「ショートカット」アプリで新規作成し、上から順に追加します。少し長いですが一度だけです。</p>
+          <p class="bm-steps-intro">スキのタイトル表示に使います。①と同じ作り方で、URLだけ変えます。</p>
           <ol class="bm-steps">
-            <li><strong>「テキスト」</strong>→ 内容に <code>SUKIMEMO_LIKES</code></li>
-            <li><strong>「変数を設定」</strong>→ 変数 <code>結果</code></li>
-            <li><strong>「URLの内容を取得」</strong>→ URL欄に下の記事一覧URLを貼り付け
+            <li><strong>「URLの内容を取得」</strong> → URL欄に下を貼り付け
               <div class="sc-url-row"><code class="sc-url">${esc(contentsUrl)}</code><button class="btn-secondary sc-copy" data-copy="${esc(contentsUrl)}">URLをコピー</button></div>
             </li>
-            <li><strong>「辞書の値を取得」</strong>→ 取得するキーに <code>data.contents</code>、入力は「URLの内容」</li>
-            <li><strong>「繰り返す（各項目）」</strong>を追加 → 上の「辞書の値」を対象にする</li>
-            <li>中に<strong>「辞書の値を取得」</strong>→ キー <code>key</code>、入力は「繰り返し項目」→ 続けて「変数を設定」で <code>キー</code> に保存</li>
-            <li>中に<strong>「辞書の値を取得」</strong>→ キー <code>name</code>、入力は「繰り返し項目」→ 続けて「変数を設定」で <code>タイトル</code> に保存</li>
-            <li>中に<strong>「URLの内容を取得」</strong>→ URLを下の形にする（<code>記事key</code> の所に変数 <code>キー</code> を入れる）
-              <div class="sc-url-row"><code class="sc-url">${esc(likesUrl)}</code><button class="btn-secondary sc-copy" data-copy="${esc(likesUrl)}">URLをコピー</button></div>
-            </li>
-            <li>中に<strong>「テキスト」</strong>→ 内容を <code>［結果］⏎@@KEY@@［キー］@@TITLE@@［タイトル］⏎［URLの内容］⏎@@@</code></li>
-            <li>中に<strong>「変数を設定」</strong>→ 変数 <code>結果</code> に、いまの「テキスト」を入れる</li>
-            <li>繰り返しの<strong>外（下）</strong>に「クリップボードにコピー」→ <code>結果</code></li>
-            <li>上部の <strong>∨</strong> → 名前を「スキ取り込み」にして「完了」</li>
+            <li><strong>「クリップボードにコピー」</strong>を追加</li>
+            <li>∨ → 名前を「記事一覧」にして「完了」</li>
           </ol>
-          <p class="bm-steps-intro">※ 記事が25本以上ある場合は、手順3のURL末尾 <code>page=1</code> を <code>page=2</code> にしたショートカットも作ると残りも取れます。</p>
+          <p class="bm-steps-intro">実行 → コピー → 上の欄に貼って「取り込む」。記事が増えたときだけ実行すればOKです。</p>
         </div>
       </details>
 
       <details class="bm-howto">
-        <summary class="bm-howto-summary">🛟 保険：ショートカットが作れない時（Safariでコピペ）</summary>
+        <summary class="bm-howto-summary">💖 ③ スキ取り込み（少し長め・でも一度だけ）</summary>
+        <div class="bm-steps-wrap">
+          <p class="bm-steps-intro">記事ごとのスキを1タップでまとめて取得します。アクションを上から順に追加してください（タイトルはアプリが②の記事一覧から補うので、ショートカット側はシンプルです）。</p>
+          <ol class="bm-steps">
+            <li><strong>「URLの内容を取得」</strong> → URL欄に下を貼り付け（②と同じURL）
+              <div class="sc-url-row"><code class="sc-url">${esc(contentsUrl)}</code><button class="btn-secondary sc-copy" data-copy="${esc(contentsUrl)}">URLをコピー</button></div>
+            </li>
+            <li><strong>「辞書の値を取得」</strong> → キーに <code>data.contents</code>（入力は「URLの内容」）</li>
+            <li><strong>「繰り返す（各項目）」</strong> → 上の「辞書の値」を対象に</li>
+            <li>繰り返しの中に<strong>「辞書の値を取得」</strong> → キー <code>key</code>（入力は「繰り返し項目」）</li>
+            <li>中に<strong>「URLの内容を取得」</strong> → URLを下の形に。<code>キー</code> の所へ、ひとつ上の「辞書の値」を入れる
+              <div class="sc-url-row"><code class="sc-url">${esc(likesUrl)}</code><button class="btn-secondary sc-copy" data-copy="${esc(likesUrl)}">URLをコピー</button></div>
+            </li>
+            <li>中に<strong>「テキスト」</strong> → 内容を <code>@@KEY@@［キー］⏎［URLの内容］⏎@@@</code>（［ ］は変数。⏎は改行）</li>
+            <li>中に<strong>「変数に追加」</strong> → 変数名 <code>結果</code>（上の「テキスト」を追加）</li>
+            <li>繰り返しの<strong>外（下）</strong>に<strong>「テキストを結合」</strong> → <code>結果</code> を、区切り「なし（改行）」で結合</li>
+            <li><strong>「クリップボードにコピー」</strong> → 結合したテキスト</li>
+            <li>∨ → 名前を「スキ取り込み」にして「完了」</li>
+          </ol>
+          <p class="bm-steps-intro">※ 記事が25本以上、または1記事のスキが多い場合は一部取りこぼすことがあります。その時は下の「保険」で個別に補えます。</p>
+        </div>
+      </details>
+
+      <details class="bm-howto">
+        <summary class="bm-howto-summary">🛟 保険：ショートカットが作れない／取りこぼした時（Safariでコピペ）</summary>
         <div class="bm-steps-wrap">
           <p class="bm-steps-intro">上のタブ「スキ」「フォロワー」から、1ページずつ確実に取り込めます。Safariのアドレスバーで直接JSONを開く方式なので、必ず動きます（ページ送りは手動）。</p>
         </div>
@@ -728,13 +738,29 @@ function bindImportPanel() {
         const added = await db.upsertFollowersNew(parsed.followers, true);
         setImportMsg(`フォロワーを取り込みました：新規 ${added}人（全${parsed.followers.length}人を確認）`, true);
         S.tab = 'followers';
-      } else {
+      } else if (parsed.type === 'articles') {
+        // 記事一覧の登録（タイトル補完用）。スキ本体は別途取り込む
+        for (const a of parsed.articles) {
+          await db.upsertArticle({
+            noteKey: a.key, title: a.title, url: a.url,
+            lastImported: new Date().toISOString(),
+          });
+        }
+        setImportMsg(`記事一覧を登録しました（${parsed.articles.length}本）。次にスキを取り込めます。`, true);
+      } else { // likes
+        // タイトルが空の記事は、登録済みの記事一覧から補う
+        const known = Object.fromEntries(
+          (await db.getAllArticles()).map(a => [a.noteKey, a.title])
+        );
         let totalAdded = 0, totalSeen = 0;
         for (const art of parsed.articles) {
-          totalSeen += art.likes.length;
-          totalAdded += await db.upsertLikesNew(art.likes);
+          const title = art.title || known[art.key] || art.key;
+          const likes = art.title ? art.likes
+            : art.likes.map(l => ({ ...l, articleTitle: title }));
+          totalSeen += likes.length;
+          totalAdded += await db.upsertLikesNew(likes);
           await db.upsertArticle({
-            noteKey: art.key, title: art.title, url: art.url,
+            noteKey: art.key, title, url: art.url,
             lastImported: new Date().toISOString(),
           });
         }
