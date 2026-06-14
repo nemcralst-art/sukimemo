@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>note CORS 検証ページ</title>
+<style>
+  body { font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 16px; background: #faf9f5; color: #2c2c2a; }
+  h1 { font-size: 18px; margin-bottom: 4px; }
+  p.note { font-size: 13px; color: #666; margin: 0 0 16px; }
+  label { font-size: 13px; font-weight: bold; }
+  input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; margin: 4px 0 12px; }
+  button {
+    display: block; width: 100%; padding: 12px;
+    background: #9F8FD4; color: #fff; border: none;
+    border-radius: 10px; font-size: 15px; font-weight: bold; cursor: pointer; margin-bottom: 16px;
+  }
+  button:active { opacity: .8; }
+  button:disabled { background: #ccc; cursor: default; }
+  .result { border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; font-size: 13px; line-height: 1.7; }
+  .result h3 { margin: 0 0 6px; font-size: 14px; }
+  .ok   { background: #eaf3de; border-left: 4px solid #5a9e1a; }
+  .err  { background: #fde8e8; border-left: 4px solid #c0392b; }
+  .info { background: #e8f0fd; border-left: 4px solid #3b6abf; }
+  code  { background: rgba(0,0,0,.07); border-radius: 4px; padding: 1px 5px; font-size: 12px; word-break: break-all; }
+  .spin { animation: spin 1s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<h1>🔬 note CORS 検証</h1>
+<p class="note">スキ・フォロワーAPIをこのページ（別オリジン）からfetchできるか調べます。<br>
+  <strong>note にログインした状態</strong>でボタンを押してください。</p>
+
+<label>あなたの note ID</label>
+<input id="noteid" placeholder="例: nemu_cat" autocorrect="off" autocapitalize="none">
+
+<label>スキを調べる記事のキー（URLの <code>/n/</code> 以降の英数字）</label>
+<input id="notekey" placeholder="例: n1a2b3c4d5e6" autocorrect="off" autocapitalize="none">
+
+<button id="btn" onclick="runTest()">▶ 検証スタート</button>
+
+<div id="out"></div>
+
+<script>
+async function runTest() {
+  const noteId  = document.getElementById('noteid').value.trim();
+  const noteKey = document.getElementById('notekey').value.trim().replace(/^n/, 'n');
+  if (!noteId)  { alert('note ID を入力してください'); return; }
+  if (!noteKey) { alert('記事キーを入力してください'); return; }
+
+  const btn = document.getElementById('btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ 検証中...';
+
+  const out = document.getElementById('out');
+  out.innerHTML = '';
+
+  const targets = [
+    {
+      label: '💖 スキAPI（with credentials）',
+      url: `https://note.com/api/v3/notes/${encodeURIComponent(noteKey)}/likes?page=1`,
+      creds: true,
+    },
+    {
+      label: '💖 スキAPI（without credentials）',
+      url: `https://note.com/api/v3/notes/${encodeURIComponent(noteKey)}/likes?page=1`,
+      creds: false,
+    },
+    {
+      label: '👥 フォロワーAPI（with credentials）',
+      url: `https://note.com/api/v2/creators/${encodeURIComponent(noteId)}/followers?page=1`,
+      creds: true,
+    },
+    {
+      label: '👥 フォロワーAPI（without credentials）',
+      url: `https://note.com/api/v2/creators/${encodeURIComponent(noteId)}/followers?page=1`,
+      creds: false,
+    },
+    {
+      label: '📄 記事一覧API（with credentials）',
+      url: `https://note.com/api/v2/creators/${encodeURIComponent(noteId)}/contents?kind=note&page=1`,
+      creds: true,
+    },
+    {
+      label: '📄 記事一覧API（without credentials）',
+      url: `https://note.com/api/v2/creators/${encodeURIComponent(noteId)}/contents?kind=note&page=1`,
+      creds: false,
+    },
+  ];
+
+  for (const t of targets) {
+    out.insertAdjacentHTML('beforeend', `<div class="result info" id="r_${uid()}">
+      <h3>${t.label}</h3>
+      <span class="spin">⏳</span> 取得中...</div>`);
+    const el = out.lastElementChild;
+    el.id = 'current';
+
+    try {
+      const opts = { method: 'GET' };
+      if (t.creds) opts.credentials = 'include';
+      const r = await fetch(t.url, opts);
+      const acao = r.headers.get('access-control-allow-origin') ?? '（ヘッダー無し）';
+      const acac = r.headers.get('access-control-allow-credentials') ?? '（ヘッダー無し）';
+      let body = null;
+      let bodyInfo = '';
+      try {
+        body = await r.json();
+        const keys = Object.keys(body?.data ?? body ?? {}).join(', ');
+        const preview = JSON.stringify(body).slice(0, 200);
+        bodyInfo = `<br><code>${escHtml(preview)}…</code>`;
+      } catch {
+        bodyInfo = '<br><em>（JSONパース失敗）</em>';
+      }
+
+      const ok = r.ok;
+      el.className = `result ${ok ? 'ok' : 'err'}`;
+      el.innerHTML = `
+        <h3>${t.label}</h3>
+        <b>${ok ? '✅ 取得成功' : `⚠️ HTTPエラー ${r.status}`}</b><br>
+        <code>access-control-allow-origin: ${escHtml(acao)}</code><br>
+        <code>access-control-allow-credentials: ${escHtml(acac)}</code>
+        ${bodyInfo}`;
+    } catch (e) {
+      el.className = 'result err';
+      el.innerHTML = `
+        <h3>${t.label}</h3>
+        <b>❌ CORSブロック（またはネットワークエラー）</b><br>
+        <code>${escHtml(String(e))}</code><br>
+        <small>→ このAPIは別オリジンJSからは取得できません</small>`;
+    }
+  }
+
+  btn.disabled = false;
+  btn.textContent = '▶ もう一度検証';
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+let _uid = 0;
+function uid() { return ++_uid; }
+</script>
+</body>
+</html>
