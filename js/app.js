@@ -414,32 +414,20 @@ function renderBookmarkletSection() {
         ※ iCloudの共有リンクでの配布はできないため、お手数ですが手順に沿って作成をお願いします。</p>
 
       <details class="bm-howto" open>
-        <summary class="bm-howto-summary">👥 ① フォロワー取り込み（7ステップ・変数なし）</summary>
+        <summary class="bm-howto-summary">👥 ① フォロワー取り込み（4ステップ・ループ方式）</summary>
         <div class="bm-steps-wrap">
-          <p class="bm-steps-intro">「ショートカット」アプリを開き、右上「＋」で新規作成。ループも変数も辞書も使いません。同じ種類のアクションを並べるだけです。</p>
+          <p class="bm-steps-intro">「ショートカット」アプリを開き、右上「＋」で新規作成。4つのアクションだけです。「テキストをつなぐ」作業は一切ありません。</p>
           <ol class="bm-steps">
-            <li>「URLの内容を取得」を追加 → URL欄に下の <strong>page=1</strong> を貼り付け
+            <li>「繰り返す」を追加 → 回数を <strong>5</strong> にする</li>
+            <li>「繰り返す」の<strong>中に</strong>「URLの内容を取得」を追加 → URL欄に下のURLを貼り付け（コピーしたら末尾の <code>1</code> を消して、変数ボタン＞「繰り返しインデックス」を入れる）
               <div class="sc-url-row"><code class="sc-url">${esc(followUrls[0])}</code><button class="btn-secondary sc-copy" data-copy="${esc(followUrls[0])}">コピー</button></div>
+              <small>→ 完成URL例：<code>${esc(followUrls[0].replace('=1','='))}【繰り返しインデックス】</code></small>
             </li>
-            <li>さらに「URLの内容を取得」を追加 → <strong>page=2</strong>
-              <div class="sc-url-row"><code class="sc-url">${esc(followUrls[1])}</code><button class="btn-secondary sc-copy" data-copy="${esc(followUrls[1])}">コピー</button></div>
-            </li>
-            <li>さらに「URLの内容を取得」を追加 → <strong>page=3</strong>
-              <div class="sc-url-row"><code class="sc-url">${esc(followUrls[2])}</code><button class="btn-secondary sc-copy" data-copy="${esc(followUrls[2])}">コピー</button></div>
-            </li>
-            <li>さらに「URLの内容を取得」を追加 → <strong>page=4</strong>
-              <div class="sc-url-row"><code class="sc-url">${esc(followUrls[3])}</code><button class="btn-secondary sc-copy" data-copy="${esc(followUrls[3])}">コピー</button></div>
-            </li>
-            <li>さらに「URLの内容を取得」を追加 → <strong>page=5</strong>
-              <div class="sc-url-row"><code class="sc-url">${esc(followUrls[4])}</code><button class="btn-secondary sc-copy" data-copy="${esc(followUrls[4])}">コピー</button></div>
-            </li>
-            <li>「テキスト」を追加 → 内容欄に、手順1〜5のそれぞれの「URLの内容」マジック変数を入れて、間を <code>@@@</code> でつなぐ<br>
-              <small>（テキスト欄をタップ → 変数ボタン → 「URLの内容」から選ぶ。5個ぶん繰り返す）</small><br>
-              最終的な内容のイメージ：<code>[1の内容]@@@[2の内容]@@@[3の内容]@@@[4の内容]@@@[5の内容]</code></li>
-            <li>「クリップボードにコピー」を追加（そのままでOK）</li>
+            <li>「繰り返す」の<strong>中に</strong>「変数に追加」を追加 → 変数名を <code>結果</code>、入力は「URLの内容」</li>
+            <li>「繰り返す」の<strong>外（下）</strong>に「クリップボードにコピー」を追加 → 入力は「変数を取得」で変数 <code>結果</code></li>
           </ol>
-          <p class="bm-steps-intro">∨（下向き矢印）→ 名前を「フォロワー取り込み」にして「完了」。<br>
-            使うとき：ショートカットを実行 → コピーされたら上の貼り付け欄に貼って「取り込む」。<br>
+          <p class="bm-steps-intro">∨ → 名前を「フォロワー取り込み」にして「完了」。<br>
+            使うとき：ショートカットを実行 → 自動でコピーされる → 上の欄に貼って「取り込む」。<br>
             5ページ＝最大60人ぶん。重複は自動スキップ、空ページは自動無視です。</p>
         </div>
       </details>

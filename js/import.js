@@ -126,16 +126,19 @@ export function parseShortcutBundle(text) {
   if (/^SUKIMEMO_LIKES/.test(t)) {
     return parseLikesBundle(t.replace(/^SUKIMEMO_LIKES/, ''));
   }
-  // @@@で複数JSONが連結されている → フォロワー多ページ（変数なし5並べ方式）
-  if (t.includes(SC_SEP) && !t.includes('@@KEY@@')) {
-    return parseFollowerBundle(t);
-  }
-  // ヘッダーは無いが @@KEY@@ マーカーがある＝スキバンドル
+  // @@KEY@@ マーカーがある＝スキバンドル
   if (t.includes('@@KEY@@')) {
     return parseLikesBundle(t);
   }
 
-  // 2) 生のJSONレスポンスをそのまま貼り付けた場合（2アクション運用）
+  // 2) 生のJSONが複数行または@@@で連結されている → フォロワー多ページ
+  //    「繰り返す → 変数に追加 → コピー」方式：iOSがリストを改行でつなぐ
+  //    「URLの内容を取得×5 → テキスト(@@@) → コピー」方式：@@@区切り
+  if (t.includes(SC_SEP) || looksLikeMultiPageFollowers(t)) {
+    return parseFollowerBundle(t);
+  }
+
+  // 3) 生のJSONレスポンスを1件そのまま貼り付けた場合（2アクション運用）
   if (t[0] === '{' || t[0] === '[') {
     let data;
     try { data = JSON.parse(t); } catch {
@@ -149,13 +152,19 @@ export function parseShortcutBundle(text) {
       return { type: 'articles', articles: articlesFromRaw(d.contents) };
     }
     if (Array.isArray(d?.likes)) {
-      // 生のスキJSON単体は、どの記事か分からないので取り込めない
       throw new Error('この内容だけではどの記事のスキか分かりません。スキは専用ショートカット（@@KEY@@付き）から取り込んでください。');
     }
     throw new Error('フォロワー／記事一覧のデータが見つかりませんでした。URLが正しいか確認してください。');
   }
 
   return null; // 取り込み対象ではない
+}
+
+// 改行区切りで複数のJSONオブジェクトが並んでいるか（繰り返す→変数に追加→コピー方式）
+function looksLikeMultiPageFollowers(t) {
+  if (t[0] !== '{') return false;
+  const lines = t.split(/\r?\n/).filter(l => l.trim());
+  return lines.length >= 2 && lines.every(l => l.trim()[0] === '{');
 }
 
 function dedupeFollowers(list) {
@@ -165,10 +174,14 @@ function dedupeFollowers(list) {
 }
 
 function parseFollowerBundle(body) {
+  // @@@区切り・改行区切りどちらも受け入れる
+  const rawBlocks = body.includes(SC_SEP)
+    ? body.split(SC_SEP)
+    : body.split(/\r?\n/);
   let all = [];
-  for (const block of body.split(SC_SEP)) {
+  for (const block of rawBlocks) {
     const s = block.trim();
-    if (!s) continue;
+    if (!s || s[0] !== '{') continue;
     let data;
     try { data = JSON.parse(s); } catch { continue; } // 壊れた/空ページは無視
     const users = data?.data?.follows ?? data?.follows ?? null;
