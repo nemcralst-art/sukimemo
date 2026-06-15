@@ -130,6 +130,8 @@ export function parseShortcutBundle(text) {
   if (t.includes(SC_SEP) && !t.includes('@@KEY@@')) {
     return parseFollowerBundle(t);
   }
+  // ヘッダーは無いが @@KEY@@ マーカーがある＝スキバンドル
+  if (t.includes('@@KEY@@')) {
     return parseLikesBundle(t);
   }
 
