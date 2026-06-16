@@ -414,22 +414,23 @@ function renderBookmarkletSection() {
         ※ iCloudの共有リンクでの配布はできないため、お手数ですが手順に沿って作成をお願いします。</p>
 
       <details class="bm-howto" open>
-        <summary class="bm-howto-summary">👥 ① フォロワー取り込み（5アクション・ループ方式）</summary>
+        <summary class="bm-howto-summary">👥 ① フォロワー取り込み（6アクション・ループ方式）</summary>
         <div class="bm-steps-wrap">
-          <p class="bm-steps-intro">「ショートカット」アプリを開き、右上「＋」で新規作成。ループ内3つ＋外1つ＝計5アクションです。</p>
+          <p class="bm-steps-intro">「ショートカット」アプリを開き、右上「＋」で新規作成。ループ内3つ＋外2つ＝計6アクションです。</p>
           <ol class="bm-steps">
             <li>「繰り返す」を追加 → 回数を <strong>5</strong> にする</li>
             <li>中に「URLの内容を取得」→ URL欄に下を貼り付け、末尾の <code>1</code> を消して変数「繰り返しインデックス」を入れる
               <div class="sc-url-row"><code class="sc-url">${esc(followUrls[0])}</code><button class="btn-secondary sc-copy" data-copy="${esc(followUrls[0])}">コピー</button></div>
             </li>
-            <li>中に「テキスト」→ 内容欄に「URLの内容」のマジック変数を入れる（テキスト欄をタップ → 変数ボタン → 「URLの内容」を選ぶ）<br>
-              <small>※ このステップがJSONをファイルから文字列に変換します。省略すると5個の別ファイルになって失敗します。</small></li>
+            <li>中に「テキスト」→ 内容欄に「URLの内容」のマジック変数を入れる（テキスト欄をタップ → 変数ボタン → 「URLの内容」を選ぶ）</li>
             <li>中に「変数に追加」→ 変数名 <code>結果</code>、入力は「テキスト」</li>
-            <li>繰り返しの<strong>外（下）</strong>に「クリップボードにコピー」→ 入力欄をタップして「変数を取得」→ <code>結果</code> を選ぶ</li>
+            <li>繰り返しの<strong>外（下）</strong>に「テキストを結合」を追加 → 入力は変数 <code>結果</code>、結合方法は「カスタム」→ 区切り文字を<strong>改行（新規行）</strong>にする<br>
+              <small>★ これが今まで抜けていた一番大事なステップ。5個バラバラのリストを1つの連結テキストにまとめます。</small></li>
+            <li>その下に「クリップボードにコピー」を追加 → 入力欄をタップして<strong>「結合されたテキスト」</strong>を選ぶ（「結果」ではない）</li>
           </ol>
           <p class="bm-steps-intro">∨ → 名前を「フォロワー取り込み」にして「完了」。<br>
             使うとき：ショートカットを実行 → 上の欄に貼り付け → 「取り込む」。<br>
-            5ページ＝最大60人ぶん。重複は自動スキップ、空ページは自動無視です。</p>
+            取り込み結果に「◯ページ分」と出ます。5ページ分なら成功です（重複は自動スキップ、空ページは自動無視）。</p>
         </div>
       </details>
 
