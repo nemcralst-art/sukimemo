@@ -741,7 +741,12 @@ function bindImportPanel() {
     try {
       if (parsed.type === 'followers') {
         const added = await db.upsertFollowersNew(parsed.followers, true);
-        setImportMsg(`フォロワーを取り込みました：新規 ${added}人（全${parsed.followers.length}人を確認）`, true);
+        // 診断：受信した文字数と、テキスト中の "follows" 出現数（＝届いたページ数）
+        const pages = (text.match(/"follows"/g) || []).length;
+        setImportMsg(
+          `フォロワーを取り込みました：新規 ${added}人（全${parsed.followers.length}人を確認）` +
+          `\n［診断］受信 ${text.length.toLocaleString()} 文字／${pages} ページ分`,
+          true);
         S.tab = 'followers';
       } else if (parsed.type === 'articles') {
         // 記事一覧の登録（タイトル補完用）。スキ本体は別途取り込む

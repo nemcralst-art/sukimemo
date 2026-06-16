@@ -552,7 +552,7 @@ img { display: block; }
 }
 .paste-area:focus { border-color: #9F8FD4; }
 
-.import-result { font-size: 13px; padding: 6px 10px; border-radius: 6px; font-weight: 600; }
+.import-result { font-size: 13px; padding: 6px 10px; border-radius: 6px; font-weight: 600; white-space: pre-wrap; line-height: 1.6; }
 .import-result.ok  { background: #EAF3DE; color: #3B6D11; }
 .import-result.err { background: #FBE9F0; color: #993556; }
 
