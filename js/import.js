@@ -131,40 +131,69 @@ export function parseShortcutBundle(text) {
     return parseLikesBundle(t);
   }
 
-  // 2) 生のJSONが複数行または@@@で連結されている → フォロワー多ページ
-  //    「繰り返す → 変数に追加 → コピー」方式：iOSがリストを改行でつなぐ
-  //    「URLの内容を取得×5 → テキスト(@@@) → コピー」方式：@@@区切り
-  if (t.includes(SC_SEP) || looksLikeMultiPageFollowers(t)) {
-    return parseFollowerBundle(t);
-  }
+  // 2) JSONオブジェクトが含まれるテキスト全般
+  //    区切りが @@@・改行・スペース・なし どれでも extractJsonObjects で分割
+  if (t.includes('{')) {
+    const blocks = extractJsonObjects(t);
+    if (blocks.length === 0) return null;
 
-  // 3) 生のJSONレスポンスを1件そのまま貼り付けた場合（2アクション運用）
-  if (t[0] === '{' || t[0] === '[') {
-    let data;
-    try { data = JSON.parse(t); } catch {
-      throw new Error('内容を読み取れませんでした。ショートカットを実行してコピーした内容をそのまま貼り付けてください。');
+    if (blocks.length === 1) {
+      // 1件のみ → 従来の単一JSON処理
+      let data;
+      try { data = JSON.parse(blocks[0]); } catch {
+        throw new Error('内容を読み取れませんでした。ショートカットを実行してコピーした内容をそのまま貼り付けてください。');
+      }
+      const d = data?.data ?? data;
+      if (Array.isArray(d?.follows)) {
+        return { type: 'followers', followers: dedupeFollowers(followersFromRaw(d.follows)) };
+      }
+      if (Array.isArray(d?.contents)) {
+        return { type: 'articles', articles: articlesFromRaw(d.contents) };
+      }
+      if (Array.isArray(d?.likes)) {
+        throw new Error('この内容だけではどの記事のスキか分かりません。スキは専用ショートカット（@@KEY@@付き）から取り込んでください。');
+      }
+      throw new Error('フォロワー／記事一覧のデータが見つかりませんでした。URLが正しいか確認してください。');
     }
-    const d = data?.data ?? data;
-    if (Array.isArray(d?.follows)) {
-      return { type: 'followers', followers: dedupeFollowers(followersFromRaw(d.follows)) };
-    }
-    if (Array.isArray(d?.contents)) {
-      return { type: 'articles', articles: articlesFromRaw(d.contents) };
-    }
-    if (Array.isArray(d?.likes)) {
-      throw new Error('この内容だけではどの記事のスキか分かりません。スキは専用ショートカット（@@KEY@@付き）から取り込んでください。');
-    }
-    throw new Error('フォロワー／記事一覧のデータが見つかりませんでした。URLが正しいか確認してください。');
+
+    // 複数ブロック → フォロワー多ページとして処理
+    return parseFollowerBlocks(blocks);
   }
 
   return null; // 取り込み対象ではない
 }
 
-// 改行区切りで複数のJSONオブジェクトが並んでいるか（繰り返す→変数に追加→コピー方式）
-function looksLikeMultiPageFollowers(t) {
-  if (t[0] !== '{') return false;
-  const lines = t.split(/\r?\n/).filter(l => l.trim());
-  return lines.length >= 2 && lines.every(l => l.trim()[0] === '{');
+// 区切り文字（@@@・改行・スペース・なし）によらず、
+// テキスト中の JSON オブジェクトをすべて抽出する
+function extractJsonObjects(text) {
+  const results = [];
+  let i = 0;
+  const n = text.length;
+  while (i < n) {
+    // 次の '{' を探す
+    while (i < n && text[i] !== '{') i++;
+    if (i >= n) break;
+    // ブレース深度を追って対応する '}' まで読む
+    let depth = 0;
+    let j = i;
+    let inStr = false;
+    let escape = false;
+    while (j < n) {
+      const c = text[j];
+      if (escape) { escape = false; j++; continue; }
+      if (c === '\\' && inStr) { escape = true; j++; continue; }
+      if (c === '"') { inStr = !inStr; j++; continue; }
+      if (inStr) { j++; continue; }
+      if (c === '{') { depth++; j++; }
+      else if (c === '}') { depth--; j++; if (depth === 0) break; }
+      else j++;
+    }
+    if (depth === 0) {
+      results.push(text.slice(i, j));
+    }
+    i = j;
+  }
+  return results;
 }
 
 function dedupeFollowers(list) {
@@ -174,16 +203,14 @@ function dedupeFollowers(list) {
 }
 
 function parseFollowerBundle(body) {
-  // @@@区切り・改行区切りどちらも受け入れる
-  const rawBlocks = body.includes(SC_SEP)
-    ? body.split(SC_SEP)
-    : body.split(/\r?\n/);
+  return parseFollowerBlocks(extractJsonObjects(body));
+}
+
+function parseFollowerBlocks(blocks) {
   let all = [];
-  for (const block of rawBlocks) {
-    const s = block.trim();
-    if (!s || s[0] !== '{') continue;
+  for (const block of blocks) {
     let data;
-    try { data = JSON.parse(s); } catch { continue; } // 壊れた/空ページは無視
+    try { data = JSON.parse(block); } catch { continue; }
     const users = data?.data?.follows ?? data?.follows ?? null;
     if (Array.isArray(users) && users.length) {
       all = all.concat(followersFromRaw(users));
