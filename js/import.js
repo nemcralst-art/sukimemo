@@ -164,7 +164,9 @@ export function parseShortcutBundle(text) {
 }
 
 // 区切り文字（@@@・改行・スペース・なし）によらず、
-// テキスト中の JSON オブジェクトをすべて抽出する
+// テキスト中の JSON オブジェクトをすべて抽出する。
+// JSON.parse を使って実際にパースできる範囲を探すため、
+// 絵文字・サロゲートペア・エスケープ文字に完全対応する。
 function extractJsonObjects(text) {
   const results = [];
   let i = 0;
@@ -173,25 +175,26 @@ function extractJsonObjects(text) {
     // 次の '{' を探す
     while (i < n && text[i] !== '{') i++;
     if (i >= n) break;
-    // ブレース深度を追って対応する '}' まで読む
-    let depth = 0;
-    let j = i;
-    let inStr = false;
-    let escape = false;
-    while (j < n) {
-      const c = text[j];
-      if (escape) { escape = false; j++; continue; }
-      if (c === '\\' && inStr) { escape = true; j++; continue; }
-      if (c === '"') { inStr = !inStr; j++; continue; }
-      if (inStr) { j++; continue; }
-      if (c === '{') { depth++; j++; }
-      else if (c === '}') { depth--; j++; if (depth === 0) break; }
-      else j++;
+    // '{' の位置から、末尾の '}' を後ろから探して JSON.parse を試みる。
+    // 最初に一致した（最短の完結する）オブジェクトを確定する。
+    let found = false;
+    let j = n;
+    while (j > i) {
+      // 後ろから直近の '}' を探す
+      while (j > i && text[j - 1] !== '}') j--;
+      if (j <= i) break;
+      try {
+        const candidate = text.slice(i, j);
+        JSON.parse(candidate);   // 成功すれば有効なJSONオブジェクト
+        results.push(candidate);
+        i = j;
+        found = true;
+        break;
+      } catch {
+        j--; // ひとつ手前の '}' を試す
+      }
     }
-    if (depth === 0) {
-      results.push(text.slice(i, j));
-    }
-    i = j;
+    if (!found) i++; // この '{' から始まるJSONは見つからなかった
   }
   return results;
 }
