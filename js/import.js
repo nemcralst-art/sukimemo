@@ -137,6 +137,13 @@ export function parseShortcutBundle(text) {
     const blocks = extractJsonObjects(t);
     if (blocks.length === 0) return null;
 
+    // 通知（notices）APIのレスポンスを最優先で判定
+    //   {data:[{kind:"like"|"follow"|...}], next_page, current_page}
+    //   スキ・フォロワーを時系列でまとめて取り込める
+    if (blocks.some(isNoticesBlock)) {
+      return parseNoticeBlocks(blocks);
+    }
+
     if (blocks.length === 1) {
       // 1件のみ → 従来の単一JSON処理
       let data;
@@ -224,6 +231,95 @@ function parseFollowerBlocks(blocks) {
     throw new Error('フォロワーが見つかりませんでした。ショートカットをもう一度実行してから貼り付けてください。');
   }
   return { type: 'followers', followers };
+}
+
+// ── 通知（notices）APIの解析 ───────────────────────────────
+// /api/v3/notices?page=N のレスポンス：
+//   {data:[ {kind, action_users, note_name, all_area_url, noticed_at, ...} ], next_page}
+// kind:"like"   → 誰かが自分の記事にスキした
+// kind:"follow" → 誰かが自分をフォローした
+// これ1本でスキ・フォロワーを時系列・新しい順でまとめて取り込める。
+
+function isNoticesBlock(block) {
+  let data;
+  try { data = JSON.parse(block); } catch { return false; }
+  const arr = data?.data;
+  return Array.isArray(arr) && arr.some(n => typeof n?.kind === 'string' && Array.isArray(n?.action_users));
+}
+
+function parseNoticeBlocks(blocks) {
+  const now = new Date().toISOString();
+  const likesMap = new Map();      // id重複を排除
+  const followersMap = new Map();  // userId重複を排除
+
+  for (const block of blocks) {
+    let data;
+    try { data = JSON.parse(block); } catch { continue; }
+    const notices = data?.data;
+    if (!Array.isArray(notices)) continue;
+
+    for (const n of notices) {
+      const users = Array.isArray(n?.action_users) ? n.action_users : [];
+      const when = n?.noticed_at ?? now;
+
+      if (n?.kind === 'like') {
+        const areaUrl = n.all_area_url ?? n.featured_area_url ?? '';
+        const noteKey = (areaUrl.match(/\/n\/([a-zA-Z0-9]+)/) || [])[1] ?? '';
+        if (!noteKey) continue;
+        const title = (n.note_name ?? n.featured_content_name ?? noteKey) || noteKey;
+        const articleUrl = `https://note.com/n/${noteKey}`;
+        for (const u of users) {
+          const urlname = noteUrlname(u?.url);
+          if (!urlname) continue;
+          const id = `${urlname}_${noteKey}`;
+          if (likesMap.has(id)) continue;
+          likesMap.set(id, {
+            id,
+            userId:          urlname,
+            userName:        u?.name ?? urlname,
+            userNoteId:      urlname,
+            profileUrl:      u?.url ?? `https://note.com/${urlname}`,
+            profileImageUrl: u?.user_profile_image_path ?? '',
+            noteKey,
+            articleTitle:    title,
+            articleUrl,
+            likedDate:       when,
+            detectedDate:    now,
+            status:          'unconfirmed',
+          });
+        }
+      } else if (n?.kind === 'follow') {
+        for (const u of users) {
+          const urlname = noteUrlname(u?.url);
+          if (!urlname) continue;
+          if (followersMap.has(urlname)) continue;
+          followersMap.set(urlname, {
+            userId:          urlname,
+            userName:        u?.name ?? urlname,
+            userNoteId:      urlname,
+            profileUrl:      u?.url ?? `https://note.com/${urlname}`,
+            profileImageUrl: u?.user_profile_image_path ?? '',
+            detectedDate:    when,
+            status:          'unconfirmed',
+            isNew:           false,
+          });
+        }
+      }
+    }
+  }
+
+  const likes = [...likesMap.values()];
+  const followers = [...followersMap.values()];
+  if (!likes.length && !followers.length) {
+    throw new Error('スキ・フォロワーの通知が見つかりませんでした。ショートカットをもう一度実行してから貼り付けてください。');
+  }
+  return { type: 'notices', likes, followers };
+}
+
+// "https://note.com/365real" → "365real"
+function noteUrlname(url) {
+  const m = (url ?? '').match(/note\.com\/([a-zA-Z0-9_]+)/);
+  return m ? m[1] : '';
 }
 
 function parseLikesBundle(body) {
