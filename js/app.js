@@ -460,10 +460,11 @@ function renderBookmarkletSection() {
             <li><strong>「辞書の値を取得」</strong> → キーに <code>data.contents</code>（入力は「URLの内容」）</li>
             <li><strong>「繰り返す（各項目）」</strong> → 上の「辞書の値」を対象に</li>
             <li>繰り返しの中に<strong>「辞書の値を取得」</strong> → キー <code>key</code>（入力は「繰り返し項目」）</li>
-            <li>中に<strong>「URLの内容を取得」</strong> → URLを下の形に。<code>キー</code> の所へ、ひとつ上の「辞書の値」を入れる
+            <li>中に<strong>「変数を設定」</strong> → 変数名 <code>キー</code>（上の「辞書の値」を保存）</li>
+            <li>中に<strong>「URLの内容を取得」</strong> → URLを下の形に。<code>キー</code> の所へ変数「キー」を入れる
               <div class="sc-url-row"><code class="sc-url">${esc(likesUrl)}</code><button class="btn-secondary sc-copy" data-copy="${esc(likesUrl)}">URLをコピー</button></div>
             </li>
-            <li>中に<strong>「テキスト」</strong> → 内容を <code>@@KEY@@［キー］⏎［URLの内容］⏎@@@</code>（［ ］は変数。⏎は改行）</li>
+            <li>中に<strong>「テキスト」</strong> → 内容を下のように入力：<br><code>@@KEY@@</code> と入力 → 変数「キー」を挿入 → 改行 → 上の「URLの内容」を挿入 → 改行 → <code>@@@</code> と入力</li>
             <li>中に<strong>「変数に追加」</strong> → 変数名 <code>結果</code>（上の「テキスト」を追加）</li>
             <li>繰り返しの<strong>外（下）</strong>に<strong>「テキストを結合」</strong> → <code>結果</code> を、区切り「なし（改行）」で結合</li>
             <li><strong>「クリップボードにコピー」</strong> → 結合したテキスト</li>
