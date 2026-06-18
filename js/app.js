@@ -388,7 +388,10 @@ async function renderImportPanel() {
 
 // ── ショートカット方式（かんたん取込） ────────────────────────
 function renderBookmarkletSection() {
-  const noticesUrl  = `https://note.com/api/v3/notices?page=1`;
+  const id = S.noteId;
+  const followUrl   = `https://note.com/api/v2/creators/${id}/followers?page=1`;
+  const contentsUrl = `https://note.com/api/v2/creators/${id}/contents?kind=note&page=1`;
+  const likesUrl    = `https://note.com/api/v3/notes/キー/likes?page=1`;
 
   return `
     <div class="import-section">
@@ -410,27 +413,62 @@ function renderBookmarkletSection() {
         ※ iCloudの共有リンクでの配布はできないため、お手数ですが手順に沿って作成をお願いします。</p>
 
       <details class="bm-howto" open>
-        <summary class="bm-howto-summary">⭐ 通知取り込み（スキ＋フォロワーをまとめて・新しい順）</summary>
+        <summary class="bm-howto-summary">👥 ① フォロワー取り込み（6アクション・ループ方式）</summary>
         <div class="bm-steps-wrap">
-          <p class="bm-steps-intro">
-            noteの「通知」を新しい順にまとめて取得します。<strong>スキも・フォロワーも・記事タイトルも、これ1本で全部取れます</strong>（記事ごとのループは不要になりました）。<br>
-            「ショートカット」アプリを開き、右上「＋」で新規作成。ループ内3つ＋外2つ＝計6アクションです。
-          </p>
+          <p class="bm-steps-intro">「ショートカット」アプリを開き、右上「＋」で新規作成。ループ内3つ＋外2つ＝計6アクションです。</p>
           <ol class="bm-steps">
-            <li>「繰り返す」を追加 → 回数を <strong>5</strong> にする（直近2週間ぶんの目安。足りなければ後で増やせます）</li>
+            <li>「繰り返す」を追加 → 回数を <strong>5</strong> にする</li>
             <li>中に「URLの内容を取得」→ URL欄に下を貼り付け、末尾の <code>1</code> を消して変数「繰り返しインデックス」を入れる
-              <div class="sc-url-row"><code class="sc-url">${esc(noticesUrl)}</code><button class="btn-secondary sc-copy" data-copy="${esc(noticesUrl)}">コピー</button></div>
+              <div class="sc-url-row"><code class="sc-url">${esc(followUrl)}</code><button class="btn-secondary sc-copy" data-copy="${esc(followUrl)}">コピー</button></div>
             </li>
             <li>中に「テキスト」→ 内容欄に「URLの内容」のマジック変数を入れる（テキスト欄をタップ → 変数ボタン → 「URLの内容」を選ぶ）</li>
             <li>中に「変数に追加」→ 変数名 <code>結果</code>、入力は「テキスト」</li>
-            <li>繰り返しの<strong>外（下）</strong>に「テキストを結合」を追加 → 入力は変数 <code>結果</code>、結合方法は「カスタム」→ 区切り文字を<strong>改行（新規行）</strong>にする<br>
-              <small>★ 5個バラバラのリストを1つの連結テキストにまとめる大事なステップです。</small></li>
+            <li>繰り返しの<strong>外（下）</strong>に「テキストを結合」を追加 → 入力は変数 <code>結果</code>、結合方法は「カスタム」→ 区切り文字を<strong>改行（新規行）</strong>にする</li>
             <li>その下に「クリップボードにコピー」を追加 → 入力欄をタップして<strong>「結合されたテキスト」</strong>を選ぶ（「結果」ではない）</li>
           </ol>
-          <p class="bm-steps-intro">∨ → 名前を「通知取り込み」にして「完了」。<br>
-            使うとき：ショートカットを実行 → 上の欄に貼り付け → 「取り込む」。<br>
-            スキとフォロワーが新しい順でまとめて入ります（重複は自動スキップ）。<br>
-            <small>※ もっと過去まで遡りたいときは、手順1の繰り返し回数を増やしてください。</small></p>
+          <p class="bm-steps-intro">∨ → 名前を「フォロワー取り込み」にして「完了」。<br>
+            使うとき：ショートカットを実行 → 上の欄に貼り付け → 「取り込む」。</p>
+        </div>
+      </details>
+
+      <details class="bm-howto">
+        <summary class="bm-howto-summary">📄 ② 記事一覧の登録（2ステップ／最初に1回）</summary>
+        <div class="bm-steps-wrap">
+          <p class="bm-steps-intro">スキのタイトル表示に使います。①と同じ作り方で、URLだけ変えます。</p>
+          <ol class="bm-steps">
+            <li><strong>「URLの内容を取得」</strong> → URL欄に下を貼り付け
+              <div class="sc-url-row"><code class="sc-url">${esc(contentsUrl)}</code><button class="btn-secondary sc-copy" data-copy="${esc(contentsUrl)}">URLをコピー</button></div>
+            </li>
+            <li><strong>「クリップボードにコピー」</strong>を追加</li>
+            <li>∨ → 名前を「記事一覧」にして「完了」</li>
+          </ol>
+          <p class="bm-steps-intro">実行 → 上の欄に貼って「取り込む」。記事が増えたときだけ再実行。</p>
+        </div>
+      </details>
+
+      <details class="bm-howto">
+        <summary class="bm-howto-summary">💖 ③ スキ取り込み（10ステップ・でも一度だけ）</summary>
+        <div class="bm-steps-wrap">
+          <p class="bm-steps-intro">記事ごとのスキを1タップでまとめて取得します。上から順にアクションを追加してください。</p>
+          <ol class="bm-steps">
+            <li><strong>「URLの内容を取得」</strong> → URL欄に下を貼り付け（②と同じURL）
+              <div class="sc-url-row"><code class="sc-url">${esc(contentsUrl)}</code><button class="btn-secondary sc-copy" data-copy="${esc(contentsUrl)}">URLをコピー</button></div>
+            </li>
+            <li><strong>「辞書の値を取得」</strong> → キーに <code>data.contents</code>（入力は「URLの内容」）</li>
+            <li><strong>「繰り返す（各項目）」</strong> → 上の「辞書の値」を対象に</li>
+            <li>繰り返しの中に<strong>「辞書の値を取得」</strong> → キー <code>key</code>（入力は「繰り返し項目」）</li>
+            <li>中に<strong>「変数を設定」</strong> → 変数名 <code>キー</code>（上の「辞書の値」を保存）</li>
+            <li>中に<strong>「URLの内容を取得」</strong> → URLを下の形に。<code>キー</code> の所へ変数「キー」を入れる
+              <div class="sc-url-row"><code class="sc-url">${esc(likesUrl)}</code><button class="btn-secondary sc-copy" data-copy="${esc(likesUrl)}">URLをコピー</button></div>
+            </li>
+            <li>中に<strong>「テキスト」</strong> → 内容を下のように入力：<br><code>@@KEY@@</code> と入力 → 変数「キー」を挿入 → 改行 → 上の「URLの内容」を挿入 → 改行 → <code>@@@</code> と入力</li>
+            <li>中に<strong>「変数に追加」</strong> → 変数名 <code>結果</code>（上の「テキスト」を追加）</li>
+            <li>繰り返しの<strong>外（下）</strong>に<strong>「テキストを結合」</strong> → <code>結果</code> を、区切り「カスタム」→ 区切り文字を<strong>改行（新規行）</strong>にする</li>
+            <li><strong>「クリップボードにコピー」</strong> → 「結合されたテキスト」を選ぶ</li>
+          </ol>
+          <p class="bm-steps-intro">∨ → 名前を「スキ取り込み」にして「完了」。<br>
+            スキの一覧は<strong>検出した日の新しい順</strong>で表示されます（取り込むたびに新しいスキだけ追加されます）。<br>
+            <small>※ 記事が25本以上ある場合は一部取りこぼすことがあります。「保険」で個別に補えます。</small></p>
         </div>
       </details>
 
