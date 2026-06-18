@@ -1,8 +1,11 @@
 import * as db from './db.js';
-import { parseFollowersJSON, parseLikesJSON, extractNoteKey, followersFromRaw, likesFromRaw, parseShortcutBundle } from './import.js';
+import { parseShortcutBundle, followersFromRaw, likesFromRaw } from './import.js';
 
 // ── アプリ名（1箇所で管理） ───────────────────────────────────
 const APP_NAME = 'スキめも';
+
+// ── プロキシ設定 ──────────────────────────────────────────────
+const DEFAULT_PROXY = 'https://note-proxy.nemcralst.workers.dev';
 
 // ── デフォルト応援キャラ（6枚 assets/ に同梱） ───────────────
 const DEFAULT_CHARAS = [
@@ -13,7 +16,6 @@ const DEFAULT_CHARAS = [
   'assets/好きメモ５.png',
   'assets/好きメモ６.png',
 ];
-
 
 const CHEERS = [
   'ぜんぶ確認できたね、おつかれさま！',
@@ -26,26 +28,28 @@ const CHEERS = [
 // ── 状態 ─────────────────────────────────────────────────────
 const S = {
   noteId:          null,
-  tab:             'likes',      // 'likes' | 'followers'
+  proxyUrl:        DEFAULT_PROXY,
+  tab:             'likes',
   likesFilter:     'unconfirmed',
-  likesSort:       'newest',     // 'newest' | 'by-article'
+  likesSort:       'newest',
   follFilter:      'unconfirmed',
-  panel:           null,         // null | 'import' | 'settings' | 'export'
+  panel:           null,
   importTab:       'bookmarklet',
   follPage:        1,
   importMsg:       '',
   importMsgOk:     true,
-  // インポートパネル内の作業用
   pendingNoteKey:  '',
   pendingTitle:    '',
   pendingUrl:      '',
-  // 応援キャラ（null = デフォルトランダム、string = カスタム画像のDataURL）
   customChara:     null,
-  // ブックマークレット受信結果（画面上部に表示）
   bmResult:        '',
-  // スキ一括確認の確認ダイアログ { ids: [...], label: '...' } | null
   confirmDialog:   null,
   likesBulkDate:   '',
+  // 自動取得の進捗
+  syncing:         false,
+  syncProgress:    '',
+  syncResult:      '',
+  syncResultOk:    true,
 };
 
 // ── ユーティリティ ────────────────────────────────────────────
@@ -57,6 +61,155 @@ const formatDate = iso => {
   return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
 };
 const randomCheer = () => CHEERS[Math.floor(Math.random() * CHEERS.length)];
+
+// ── プロキシ経由fetch ─────────────────────────────────────────
+async function noteApiFetch(apiPath) {
+  const url = `${S.proxyUrl}/?path=${encodeURIComponent(apiPath)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+// ── 自動取得（フォロワー＋スキ） ──────────────────────────────
+async function syncAll() {
+  if (S.syncing) return;
+  S.syncing = true;
+  S.syncProgress = '更新を開始...';
+  S.syncResult = '';
+  updateSyncUI();
+
+  try {
+    // 1) フォロワー取得（全ページ）
+    S.syncProgress = 'フォロワーを取得中...';
+    updateSyncUI();
+    let allFollowers = [];
+    let fPage = 1;
+    while (true) {
+      S.syncProgress = `フォロワーを取得中...（${fPage}ページ目）`;
+      updateSyncUI();
+      const data = await noteApiFetch(`/api/v2/creators/${S.noteId}/followers?page=${fPage}`);
+      const users = data?.data?.follows ?? [];
+      if (users.length) allFollowers = allFollowers.concat(followersFromRaw(users));
+      if (data?.data?.isLastPage || !users.length) break;
+      fPage++;
+    }
+    const addedF = await db.upsertFollowersNew(allFollowers, true);
+
+    // 2) 記事一覧取得（全ページ）→ likeCount差分でスキ取得対象を決定
+    S.syncProgress = '記事一覧を取得中...';
+    updateSyncUI();
+    let allContents = [];
+    let cPage = 1;
+    while (true) {
+      const data = await noteApiFetch(`/api/v2/creators/${S.noteId}/contents?kind=note&page=${cPage}`);
+      const contents = data?.data?.contents ?? [];
+      if (contents.length) allContents = allContents.concat(contents);
+      if (data?.data?.isLastPage || !contents.length) break;
+      cPage++;
+    }
+
+    // 保存済み記事のlikeCountと比較し、変更があった記事だけスキを再取得
+    const storedArticles = await db.getAllArticles();
+    const storedMap = Object.fromEntries(storedArticles.map(a => [a.noteKey, a]));
+
+    const articlesToFetch = [];
+    for (const c of allContents) {
+      const key = c.key ?? c.id ?? '';
+      if (!key) continue;
+      const currentCount = c.likeCount ?? c.like_count ?? 0;
+      const stored = storedMap[String(key)];
+      if (!stored || (stored.likeCount ?? -1) !== currentCount) {
+        articlesToFetch.push({
+          key: String(key),
+          title: c.name ?? c.title ?? String(key),
+          url: c.noteUrl ?? c.note_url ?? `https://note.com/${S.noteId}/n/${key}`,
+          likeCount: currentCount,
+        });
+      }
+    }
+
+    // 3) スキ取得（変更のあった記事のみ）
+    let addedL = 0, totalLikes = 0;
+    for (let i = 0; i < articlesToFetch.length; i++) {
+      const art = articlesToFetch[i];
+      S.syncProgress = `スキを取得中...（${i + 1}/${articlesToFetch.length}記事）`;
+      updateSyncUI();
+
+      let artLikes = [];
+      let lPage = 1;
+      while (true) {
+        const data = await noteApiFetch(`/api/v3/notes/${art.key}/likes?page=${lPage}`);
+        const rawLikes = data?.data?.likes ?? [];
+        if (!rawLikes.length) break;
+        const now = new Date().toISOString();
+        for (const item of rawLikes) {
+          const u = item.user ?? item;
+          const userId = String(u.id ?? u.userId ?? '');
+          if (!userId) continue;
+          artLikes.push({
+            id:              `${userId}_${art.key}`,
+            userId,
+            userName:        u.nickname ?? u.name ?? u.urlname ?? '不明',
+            userNoteId:      u.urlname ?? '',
+            profileUrl:      u.urlname ? `https://note.com/${u.urlname}` : '',
+            profileImageUrl: u.user_profile_image_url ?? u.userProfileImagePath ?? u.icon ?? '',
+            noteKey:         art.key,
+            articleTitle:    art.title,
+            articleUrl:      art.url,
+            likedDate:       item.createdAt ?? item.created_at ?? now,
+            detectedDate:    now,
+            status:          'unconfirmed',
+          });
+        }
+        if (rawLikes.length < 10) break;
+        lPage++;
+      }
+      totalLikes += artLikes.length;
+      addedL += await db.upsertLikesNew(artLikes);
+
+      // 記事にlikeCountを保存（差分検出用）
+      await db.upsertArticle({
+        noteKey: art.key,
+        title: art.title,
+        url: art.url,
+        likeCount: art.likeCount,
+        lastImported: new Date().toISOString(),
+      });
+    }
+
+    // likeCount未変更の記事もタイトル・URLは更新
+    for (const c of allContents) {
+      const key = String(c.key ?? c.id ?? '');
+      if (!key) continue;
+      if (!articlesToFetch.some(a => a.key === key)) {
+        await db.upsertArticle({
+          noteKey: key,
+          title: c.name ?? c.title ?? key,
+          url: c.noteUrl ?? c.note_url ?? `https://note.com/${S.noteId}/n/${key}`,
+          likeCount: c.likeCount ?? c.like_count ?? 0,
+          lastImported: storedMap[key]?.lastImported ?? new Date().toISOString(),
+        });
+      }
+    }
+
+    const skipped = allContents.length - articlesToFetch.length;
+    S.syncResult = `更新完了：フォロワー 新規${addedF}人（全${allFollowers.length}人）` +
+      `／スキ 新規${addedL}件（${articlesToFetch.length}記事を取得・${skipped}記事はスキップ・全${totalLikes}件確認）`;
+    S.syncResultOk = true;
+  } catch (err) {
+    S.syncResult = `更新エラー：${err.message}`;
+    S.syncResultOk = false;
+  } finally {
+    S.syncing = false;
+    S.syncProgress = '';
+    render();
+  }
+}
+
+function updateSyncUI() {
+  const el = $('sync-progress');
+  if (el) el.textContent = S.syncProgress;
+}
 
 // ── メインレンダー ────────────────────────────────────────────
 async function render() {
@@ -73,7 +226,7 @@ async function render() {
   root.innerHTML = `
     ${renderHeader()}
     <main class="main-content">
-      ${S.bmResult ? `<div class="bm-banner">${esc(S.bmResult)}<button class="bm-banner-close" id="bm-banner-close">✕</button></div>` : ''}
+      ${renderSyncSection()}
       ${renderTabs()}
       <div id="tab-content">
         ${S.tab === 'likes' ? renderLikesTab(likes) : renderFollowersTab(followers)}
@@ -81,7 +234,6 @@ async function render() {
     </main>
     ${S.panel === 'import'   ? await renderImportPanel() : ''}
     ${S.panel === 'settings' ? renderSettingsPanel() : ''}
-    ${S.panel === 'export'   ? renderExportPanel() : ''}
     ${S.confirmDialog ? renderConfirmDialog() : ''}
     <button class="top-btn" id="top-btn" hidden>TOP ↑</button>
   `;
@@ -130,10 +282,21 @@ function renderHeader() {
     <header class="header">
       <span class="header-title">${esc(APP_NAME)}　🐰</span>
       <div class="header-btns">
-        <button class="icon-btn" id="btn-import" title="データを取り込む">🔄</button>
         <button class="icon-btn" id="btn-settings" title="設定">⚙️</button>
       </div>
     </header>`;
+}
+
+// ── 更新ボタン＋進捗表示（メインコンテンツ直下） ──────────────
+function renderSyncSection() {
+  return `
+    <div class="sync-section">
+      <button class="btn-sync" id="btn-sync" ${S.syncing ? 'disabled' : ''}>
+        ${S.syncing ? '⏳ 更新中...' : '🔄 スキ・フォロワーを更新'}
+      </button>
+      ${S.syncProgress ? `<p class="sync-progress" id="sync-progress">${esc(S.syncProgress)}</p>` : ''}
+      ${S.syncResult ? `<p class="sync-result ${S.syncResultOk ? 'ok' : 'err'}">${esc(S.syncResult)}</p>` : ''}
+    </div>`;
 }
 
 // ── タブ ─────────────────────────────────────────────────────
@@ -154,7 +317,7 @@ function renderLikesTab(likes) {
   let listHtml;
   if (shown.length === 0) {
     if (likes.length === 0) {
-      listHtml = emptyState('まだデータがありません。🔄 ボタンから取り込みができます。');
+      listHtml = emptyState('まだデータがありません。上の「更新」ボタンで取り込めます。');
     } else if (S.likesFilter === 'unconfirmed') {
       listHtml = cheerCard();
     } else {
@@ -190,7 +353,6 @@ function renderLikesTab(likes) {
 }
 
 function renderLikesUnconfirmed(items, allLikes) {
-  // 人でグループ化
   const map = new Map();
   const sorted = [...items].sort((a, b) => {
     if (S.likesSort === 'newest') return (b.detectedDate ?? '').localeCompare(a.detectedDate ?? '');
@@ -255,7 +417,7 @@ function renderFollowersTab(followers) {
   let listHtml;
   if (shown.length === 0) {
     if (followers.length === 0) {
-      listHtml = emptyState('まだデータがありません。🔄 ボタンから取り込みができます。');
+      listHtml = emptyState('まだデータがありません。上の「更新」ボタンで取り込めます。');
     } else if (S.follFilter === 'unconfirmed') {
       listHtml = cheerCard();
     } else {
@@ -325,7 +487,7 @@ function cheerCard() {
     </div>`;
 }
 
-// ── インポートパネル ──────────────────────────────────────────
+// ── インポートパネル（保険：手動コピペ用） ────────────────────
 async function renderImportPanel() {
   const articles = await db.getAllArticles();
 
@@ -366,121 +528,34 @@ async function renderImportPanel() {
         ? `<p class="import-result ${S.importMsgOk?'ok':'err'}">${esc(S.importMsg)}</p>` : ''}
     </div>`;
 
+  const pasteHtml = `
+    <div class="import-section">
+      <p class="import-desc">iOSショートカットなどでコピーしたJSONを貼り付けて取り込めます（保険用）。</p>
+      <textarea id="paste-shortcut" class="paste-area" placeholder="JSONを貼り付け"></textarea>
+      <button class="btn-primary btn-wide" id="btn-import-shortcut">取り込む</button>
+      ${S.importMsg && S.importTab==='bookmarklet'
+        ? `<p class="import-result ${S.importMsgOk?'ok':'err'}">${esc(S.importMsg)}</p>` : ''}
+    </div>`;
+
   return `
     <div class="panel-overlay" id="panel-overlay">
       <div class="panel">
         <div class="panel-header">
-          <span class="panel-title">データを取り込む</span>
+          <span class="panel-title">手動取り込み（保険）</span>
           <button class="panel-close" id="panel-close">✕</button>
         </div>
         <div class="panel-tabs">
-          <button class="panel-tab ${S.importTab==='bookmarklet'?'active':''}" data-itab="bookmarklet">かんたん</button>
+          <button class="panel-tab ${S.importTab==='bookmarklet'?'active':''}" data-itab="bookmarklet">貼り付け</button>
           <button class="panel-tab ${S.importTab==='likes'?'active':''}"     data-itab="likes">スキ</button>
           <button class="panel-tab ${S.importTab==='followers'?'active':''}" data-itab="followers">フォロワー</button>
         </div>
         <div class="panel-body">
-          ${S.importTab === 'bookmarklet' ? renderBookmarkletSection()
+          ${S.importTab === 'bookmarklet' ? pasteHtml
             : S.importTab === 'likes' ? likesHtml : follHtml}
         </div>
       </div>
     </div>`;
 }
-
-// ── ショートカット方式（かんたん取込） ────────────────────────
-function renderBookmarkletSection() {
-  const id = S.noteId;
-  const followUrl   = `https://note.com/api/v2/creators/${id}/followers?page=1`;
-  const contentsUrl = `https://note.com/api/v2/creators/${id}/contents?kind=note&page=1`;
-  const likesUrl    = `https://note.com/api/v3/notes/キー/likes?page=1`;
-
-  return `
-    <div class="import-section">
-      <p class="import-desc">
-        iPhoneだけで完結する方法です。<strong>「ショートカット」アプリ</strong>に取り込み動作を一度だけ登録すれば、
-        次からは<strong>ボタン1つで取得</strong>して、ここに貼り付けるだけで取り込めます。
-        （Safariもnoteアプリも経由しないので、noteアプリが入っていても大丈夫です）
-      </p>
-
-      <div class="sc-paste-box">
-        <p class="sc-paste-label">📥 ショートカットでコピーした内容をここに貼り付け</p>
-        <textarea id="paste-shortcut" class="paste-area" placeholder="ショートカットを実行 →「コピー」された内容をここに貼り付け"></textarea>
-        <button class="btn-primary btn-wide" id="btn-import-shortcut">取り込む</button>
-        ${S.importMsg && S.importTab==='bookmarklet'
-          ? `<p class="import-result ${S.importMsgOk?'ok':'err'}">${esc(S.importMsg)}</p>` : ''}
-      </div>
-
-      <p class="bm-recommend">▼ はじめに、下のショートカットを作ってください（一度だけの設定です）。<br>
-        ※ iCloudの共有リンクでの配布はできないため、お手数ですが手順に沿って作成をお願いします。</p>
-
-      <details class="bm-howto" open>
-        <summary class="bm-howto-summary">👥 ① フォロワー取り込み（6アクション・ループ方式）</summary>
-        <div class="bm-steps-wrap">
-          <p class="bm-steps-intro">「ショートカット」アプリを開き、右上「＋」で新規作成。ループ内3つ＋外2つ＝計6アクションです。</p>
-          <ol class="bm-steps">
-            <li>「繰り返す」を追加 → 回数を <strong>5</strong> にする</li>
-            <li>中に「URLの内容を取得」→ URL欄に下を貼り付け、末尾の <code>1</code> を消して変数「繰り返しインデックス」を入れる
-              <div class="sc-url-row"><code class="sc-url">${esc(followUrl)}</code><button class="btn-secondary sc-copy" data-copy="${esc(followUrl)}">コピー</button></div>
-            </li>
-            <li>中に「テキスト」→ 内容欄に「URLの内容」のマジック変数を入れる（テキスト欄をタップ → 変数ボタン → 「URLの内容」を選ぶ）</li>
-            <li>中に「変数に追加」→ 変数名 <code>結果</code>、入力は「テキスト」</li>
-            <li>繰り返しの<strong>外（下）</strong>に「テキストを結合」を追加 → 入力は変数 <code>結果</code>、結合方法は「カスタム」→ 区切り文字を<strong>改行（新規行）</strong>にする</li>
-            <li>その下に「クリップボードにコピー」を追加 → 入力欄をタップして<strong>「結合されたテキスト」</strong>を選ぶ（「結果」ではない）</li>
-          </ol>
-          <p class="bm-steps-intro">∨ → 名前を「フォロワー取り込み」にして「完了」。<br>
-            使うとき：ショートカットを実行 → 上の欄に貼り付け → 「取り込む」。</p>
-        </div>
-      </details>
-
-      <details class="bm-howto">
-        <summary class="bm-howto-summary">📄 ② 記事一覧の登録（2ステップ／最初に1回）</summary>
-        <div class="bm-steps-wrap">
-          <p class="bm-steps-intro">スキのタイトル表示に使います。①と同じ作り方で、URLだけ変えます。</p>
-          <ol class="bm-steps">
-            <li><strong>「URLの内容を取得」</strong> → URL欄に下を貼り付け
-              <div class="sc-url-row"><code class="sc-url">${esc(contentsUrl)}</code><button class="btn-secondary sc-copy" data-copy="${esc(contentsUrl)}">URLをコピー</button></div>
-            </li>
-            <li><strong>「クリップボードにコピー」</strong>を追加</li>
-            <li>∨ → 名前を「記事一覧」にして「完了」</li>
-          </ol>
-          <p class="bm-steps-intro">実行 → 上の欄に貼って「取り込む」。記事が増えたときだけ再実行。</p>
-        </div>
-      </details>
-
-      <details class="bm-howto">
-        <summary class="bm-howto-summary">💖 ③ スキ取り込み（10ステップ・でも一度だけ）</summary>
-        <div class="bm-steps-wrap">
-          <p class="bm-steps-intro">記事ごとのスキを1タップでまとめて取得します。上から順にアクションを追加してください。</p>
-          <ol class="bm-steps">
-            <li><strong>「URLの内容を取得」</strong> → URL欄に下を貼り付け（②と同じURL）
-              <div class="sc-url-row"><code class="sc-url">${esc(contentsUrl)}</code><button class="btn-secondary sc-copy" data-copy="${esc(contentsUrl)}">URLをコピー</button></div>
-            </li>
-            <li><strong>「辞書の値を取得」</strong> → キーに <code>data.contents</code>（入力は「URLの内容」）</li>
-            <li><strong>「繰り返す（各項目）」</strong> → 上の「辞書の値」を対象に</li>
-            <li>繰り返しの中に<strong>「辞書の値を取得」</strong> → キー <code>key</code>（入力は「繰り返し項目」）</li>
-            <li>中に<strong>「変数を設定」</strong> → 変数名 <code>キー</code>（上の「辞書の値」を保存）</li>
-            <li>中に<strong>「URLの内容を取得」</strong> → URLを下の形に。<code>キー</code> の所へ変数「キー」を入れる
-              <div class="sc-url-row"><code class="sc-url">${esc(likesUrl)}</code><button class="btn-secondary sc-copy" data-copy="${esc(likesUrl)}">URLをコピー</button></div>
-            </li>
-            <li>中に<strong>「テキスト」</strong> → 内容を下のように入力：<br><code>@@KEY@@</code> と入力 → 変数「キー」を挿入 → 改行 → 上の「URLの内容」を挿入 → 改行 → <code>@@@</code> と入力</li>
-            <li>中に<strong>「変数に追加」</strong> → 変数名 <code>結果</code>（上の「テキスト」を追加）</li>
-            <li>繰り返しの<strong>外（下）</strong>に<strong>「テキストを結合」</strong> → <code>結果</code> を、区切り「カスタム」→ 区切り文字を<strong>改行（新規行）</strong>にする</li>
-            <li><strong>「クリップボードにコピー」</strong> → 「結合されたテキスト」を選ぶ</li>
-          </ol>
-          <p class="bm-steps-intro">∨ → 名前を「スキ取り込み」にして「完了」。<br>
-            スキの一覧は<strong>検出した日の新しい順</strong>で表示されます（取り込むたびに新しいスキだけ追加されます）。<br>
-            <small>※ 記事が25本以上ある場合は一部取りこぼすことがあります。「保険」で個別に補えます。</small></p>
-        </div>
-      </details>
-
-      <details class="bm-howto">
-        <summary class="bm-howto-summary">🛟 保険：ショートカットが作れない／取りこぼした時（Safariでコピペ）</summary>
-        <div class="bm-steps-wrap">
-          <p class="bm-steps-intro">上のタブ「スキ」「フォロワー」から、1ページずつ確実に取り込めます。Safariのアドレスバーで直接JSONを開く方式なので、必ず動きます（ページ送りは手動）。</p>
-        </div>
-      </details>
-    </div>`;
-}
-
 
 // ── 設定パネル ────────────────────────────────────────────────
 function renderSettingsPanel() {
@@ -497,6 +572,13 @@ function renderSettingsPanel() {
             <div class="settings-id-row">
               <code class="settings-id-val">${esc(S.noteId)}</code>
               <button class="btn-text" id="btn-change-id">変更</button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <label class="settings-label">プロキシURL</label>
+            <div class="settings-id-row">
+              <code class="settings-id-val" style="font-size:11px;word-break:break-all">${esc(S.proxyUrl)}</code>
+              <button class="btn-text" id="btn-change-proxy">変更</button>
             </div>
           </div>
           <div class="settings-row">
@@ -522,6 +604,7 @@ function renderSettingsPanel() {
                 JSONを読み込む
                 <input type="file" accept=".json" id="import-file-input" style="display:none">
               </label>
+              <button class="btn-secondary" id="btn-manual-import" style="margin-top:4px">手動取り込み（保険）</button>
             </div>
           </div>
         </div>
@@ -529,13 +612,13 @@ function renderSettingsPanel() {
     </div>`;
 }
 
-function renderExportPanel() { return ''; } // 使わない（直接DL）
-
 // ── イベントバインド（メイン） ────────────────────────────────
 function bindMain(likes, followers) {
   // ヘッダー
-  $('btn-import')?.addEventListener('click', () => { S.panel = 'import'; S.importMsg = ''; render(); });
   $('btn-settings')?.addEventListener('click', () => { S.panel = 'settings'; render(); });
+
+  // 更新ボタン
+  $('btn-sync')?.addEventListener('click', () => syncAll());
 
   // タブ切り替え
   document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -549,38 +632,27 @@ function bindMain(likes, followers) {
     });
     $('likes-sort')?.addEventListener('change', e => { S.likesSort = e.target.value; render(); });
 
-    // 一括確認：全部
     $('btn-likes-bulk-all')?.addEventListener('click', () => {
       const ids = likes.filter(l => l.status === 'unconfirmed').map(l => l.id);
       S.confirmDialog = { ids, label: `未確認のスキ ${ids.length}件をすべて確認済みにします。よろしいですか？` };
       render();
     });
 
-    // 一括確認：日付より前
     $('likes-bulk-date')?.addEventListener('change', e => { S.likesBulkDate = e.target.value; });
     $('btn-likes-bulk-date')?.addEventListener('click', () => {
       const dateStr = $('likes-bulk-date')?.value;
-      if (!dateStr) {
-        alert('日付を選んでください');
-        return;
-      }
+      if (!dateStr) { alert('日付を選んでください'); return; }
       S.likesBulkDate = dateStr;
-      // 選んだ日の0時より前（=その日を含まない）のスキが対象
       const cutoff = new Date(dateStr + 'T00:00:00');
       const ids = likes
         .filter(l => l.status === 'unconfirmed' && l.likedDate && new Date(l.likedDate) < cutoff)
         .map(l => l.id);
-      if (ids.length === 0) {
-        S.confirmDialog = null;
-        alert('この日より前の未確認のスキはありません');
-        return;
-      }
+      if (ids.length === 0) { alert('この日より前の未確認のスキはありません'); return; }
       const d = new Date(dateStr);
       S.confirmDialog = { ids, label: `${d.getMonth()+1}月${d.getDate()}日より前のスキ ${ids.length}件を確認済みにします。よろしいですか？` };
       render();
     });
 
-    // 確認済みに / 戻す
     document.querySelectorAll('.btn-confirm[data-type="like"]').forEach(btn => {
       btn.addEventListener('click', async () => {
         await db.updateLikeStatus(btn.dataset.id, 'confirmed');
@@ -632,9 +704,6 @@ function bindMain(likes, followers) {
     });
   }
 
-  // ブックマークレット結果バナーを閉じる
-  $('bm-banner-close')?.addEventListener('click', () => { S.bmResult = ''; render(); });
-
   // パネル共通：閉じる・オーバーレイクリック
   $('panel-close')?.addEventListener('click', () => { S.panel = null; render(); });
   $('panel-overlay')?.addEventListener('click', e => {
@@ -659,6 +728,19 @@ function bindMain(likes, followers) {
         S.panel = null;
         render();
       }
+    });
+    $('btn-change-proxy')?.addEventListener('click', async () => {
+      const newUrl = prompt('プロキシURL', S.proxyUrl);
+      if (newUrl && newUrl.trim()) {
+        S.proxyUrl = newUrl.trim().replace(/\/$/, '');
+        await db.setSetting('proxyUrl', S.proxyUrl);
+        render();
+      }
+    });
+    $('btn-manual-import')?.addEventListener('click', () => {
+      S.panel = 'import';
+      S.importMsg = '';
+      render();
     });
     $('btn-export')?.addEventListener('click', async () => {
       const data = await db.exportAll();
@@ -686,7 +768,6 @@ function bindMain(likes, followers) {
         alert('読み込みに失敗しました。ファイルを確認してください。');
       }
     });
-    // 応援キャラ：ファイル選択
     $('chara-file-input')?.addEventListener('change', async e => {
       const file = e.target.files[0];
       if (!file) return;
@@ -695,7 +776,6 @@ function bindMain(likes, followers) {
       await db.setSetting('customChara', dataUrl);
       render();
     });
-    // 応援キャラ：デフォルトに戻す
     $('btn-chara-reset')?.addEventListener('click', async () => {
       S.customChara = null;
       await db.setSetting('customChara', null);
@@ -711,80 +791,50 @@ function bindMain(likes, followers) {
   $('top-btn')?.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
 }
 
-// ── インポートパネルのバインド ────────────────────────────────
+// ── インポートパネルのバインド（保険用） ──────────────────────
 function bindImportPanel() {
-  // ショートカット用URLのコピー
-  document.querySelectorAll('.sc-copy').forEach(btn => {
-    const orig = btn.textContent;
-    btn.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(btn.dataset.copy);
-        btn.textContent = 'コピー✓';
-        setTimeout(() => { btn.textContent = orig; }, 2000);
-      } catch {
-        prompt('下を全選択してコピーしてください', btn.dataset.copy);
-      }
-    });
-  });
-
-  // ショートカットから貼り付けた内容を取り込む（フォロワー/スキ 自動判別）
+  // ショートカットから貼り付けた内容を取り込む
   $('btn-import-shortcut')?.addEventListener('click', async () => {
     const text = $('paste-shortcut')?.value.trim() ?? '';
-    if (!text) { setImportMsg('ショートカットでコピーした内容を貼り付けてください', false); return; }
+    if (!text) { setImportMsg('JSONを貼り付けてください', false); return; }
     let parsed;
     try { parsed = parseShortcutBundle(text); }
     catch (err) { setImportMsg(err.message, false); return; }
     if (!parsed) {
-      setImportMsg('ショートカットの内容ではないようです。ショートカットを実行してから貼り付けてください。', false);
+      setImportMsg('取り込める内容ではないようです。', false);
       return;
     }
     try {
       if (parsed.type === 'notices') {
-        // 通知API：スキ・フォロワーを時系列でまとめて取り込む
         const addedL = await db.upsertLikesNew(parsed.likes);
         const addedF = await db.upsertFollowersNew(parsed.followers, true);
         setImportMsg(
           `通知から取り込みました：スキ 新規${addedL}件（全${parsed.likes.length}件）／` +
           `フォロワー 新規${addedF}人（全${parsed.followers.length}人）`,
           true);
-        S.tab = 'likes';
       } else if (parsed.type === 'followers') {
         const added = await db.upsertFollowersNew(parsed.followers, true);
-        // 診断：受信した文字数と、テキスト中の "follows" 出現数（＝届いたページ数）
-        const pages = (text.match(/"follows"/g) || []).length;
-        setImportMsg(
-          `フォロワーを取り込みました：新規 ${added}人（全${parsed.followers.length}人を確認）` +
-          `\n［診断］受信 ${text.length.toLocaleString()} 文字／${pages} ページ分`,
-          true);
-        S.tab = 'followers';
+        setImportMsg(`フォロワーを取り込みました：新規 ${added}人（全${parsed.followers.length}人）`, true);
       } else if (parsed.type === 'articles') {
-        // 記事一覧の登録（タイトル補完用）。スキ本体は別途取り込む
         for (const a of parsed.articles) {
           await db.upsertArticle({
             noteKey: a.key, title: a.title, url: a.url,
             lastImported: new Date().toISOString(),
           });
         }
-        setImportMsg(`記事一覧を登録しました（${parsed.articles.length}本）。次にスキを取り込めます。`, true);
-      } else { // likes
-        // タイトルが空の記事は、登録済みの記事一覧から補う
+        setImportMsg(`記事一覧を登録しました（${parsed.articles.length}本）`, true);
+      } else {
         const known = Object.fromEntries(
           (await db.getAllArticles()).map(a => [a.noteKey, a.title])
         );
         let totalAdded = 0, totalSeen = 0;
         for (const art of parsed.articles) {
           const title = art.title || known[art.key] || art.key;
-          const likes = art.title ? art.likes
-            : art.likes.map(l => ({ ...l, articleTitle: title }));
+          const likes = art.title ? art.likes : art.likes.map(l => ({ ...l, articleTitle: title }));
           totalSeen += likes.length;
           totalAdded += await db.upsertLikesNew(likes);
-          await db.upsertArticle({
-            noteKey: art.key, title, url: art.url,
-            lastImported: new Date().toISOString(),
-          });
         }
-        setImportMsg(`スキを取り込みました：新規 ${totalAdded}件（${parsed.articles.length}記事・全${totalSeen}件を確認）`, true);
-        S.tab = 'likes';
+        setImportMsg(`スキを取り込みました：新規 ${totalAdded}件（全${totalSeen}件確認）`, true);
       }
       $('paste-shortcut').value = '';
     } catch (err) {
@@ -803,8 +853,8 @@ function bindImportPanel() {
     const text = $('paste-followers')?.value.trim() ?? '';
     if (!text) { setImportMsg('JSONを貼り付けてください', false); return; }
     try {
+      const { parseFollowersJSON } = await import('./import.js');
       const { followers, isLastPage, nextPage } = parseFollowersJSON(text);
-      // ページ1の取り込み＝新しいセッションの開始。前回ぶんのNEWを外す
       const added = await db.upsertFollowersNew(followers, S.follPage === 1);
       S.follPage = isLastPage ? 1 : (nextPage ?? S.follPage + 1);
       const more = isLastPage ? '' : `　次のページ（${S.follPage}）もあります。`;
@@ -816,31 +866,28 @@ function bindImportPanel() {
   });
 
   // スキ：記事URL入力
-  $('article-url-input')?.addEventListener('input', e => {
-    S.pendingUrl = e.target.value;
-  });
+  $('article-url-input')?.addEventListener('input', e => { S.pendingUrl = e.target.value; });
 
-  // スキ：取り込み済み記事を選択
   document.querySelectorAll('.article-select-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       S.pendingUrl = btn.dataset.url;
       S.pendingNoteKey = btn.dataset.key;
-      render(); // パネルを再描画してURLを反映
+      render();
     });
   });
 
-  // スキ：開く
   $('btn-open-likes')?.addEventListener('click', () => {
+    const { extractNoteKey } = require_import();
     const noteKey = extractNoteKey($('article-url-input')?.value ?? S.pendingUrl);
     if (!noteKey) { setImportMsg('記事のURLを入力してください', false); return; }
     S.pendingNoteKey = noteKey;
     window.open(`https://note.com/api/v3/notes/${encodeURIComponent(noteKey)}/likes`, '_blank');
   });
 
-  // スキ：取り込む
   $('btn-import-likes')?.addEventListener('click', async () => {
     const text = $('paste-likes')?.value.trim() ?? '';
     if (!text) { setImportMsg('JSONを貼り付けてください', false); return; }
+    const { parseLikesJSON, extractNoteKey } = await import('./import.js');
     const noteKey = S.pendingNoteKey || extractNoteKey($('article-url-input')?.value ?? '');
     if (!noteKey) { setImportMsg('記事URLを先に入力して「noteで開く」を押してください', false); return; }
     const articleUrl = ($('article-url-input')?.value ?? '').trim() || `https://note.com/n/${noteKey}`;
@@ -859,7 +906,6 @@ function bindImportPanel() {
 function setImportMsg(msg, ok) {
   S.importMsg = msg;
   S.importMsgOk = ok;
-  // メッセージだけ差し込む（全体再レンダーは重いので要素を直接更新）
   const el = document.querySelector('.import-result');
   if (el) {
     el.textContent = msg;
@@ -895,65 +941,13 @@ function compressImage(file, maxSize = 400, quality = 0.75) {
   });
 }
 
-// ── ブックマークレットからの受信（postMessage） ───────────────
-let bmProcessing = false;
-
-async function handleBookmarkletMessage(e) {
-  // 送信元が note.com であることを必ず検証する
-  if (e.origin !== 'https://note.com') return;
-  const msg = e.data;
-  if (!msg || typeof msg.type !== 'string') return;
-  if (bmProcessing) { ack(e); return; } // 再送ぶんは無視してackだけ返す
-
-  if (msg.type === 'sukimemo:followers' && Array.isArray(msg.follows)) {
-    bmProcessing = true;
-    ack(e);
-    const followers = followersFromRaw(msg.follows);
-    const added = await db.upsertFollowersNew(followers, true);
-    S.bmResult = `フォロワーを取り込みました：新規 ${added}人（全${followers.length}人を確認）`;
-    S.tab = 'followers';
-    S.panel = null;
-    await render();
-    bmProcessing = false;
-  }
-
-  if (msg.type === 'sukimemo:likes' && Array.isArray(msg.articles)) {
-    bmProcessing = true;
-    ack(e);
-    let totalAdded = 0, totalSeen = 0;
-    for (const art of msg.articles) {
-      if (!art?.key) continue;
-      const likes = likesFromRaw(art.likes ?? [], art.key, art.title, art.url);
-      totalSeen += likes.length;
-      totalAdded += await db.upsertLikesNew(likes);
-      if (likes.length > 0 || art.title) {
-        await db.upsertArticle({
-          noteKey: art.key,
-          title: art.title || art.key,
-          url: art.url || `https://note.com/n/${art.key}`,
-          lastImported: new Date().toISOString(),
-        });
-      }
-    }
-    S.bmResult = `スキを取り込みました：新規 ${totalAdded}件（${msg.articles.length}記事・全${totalSeen}件を確認）`;
-    S.tab = 'likes';
-    S.panel = null;
-    await render();
-    bmProcessing = false;
-  }
-}
-
-function ack(e) {
-  try { e.source?.postMessage({ type: 'sukimemo:ack' }, e.origin); } catch {}
-}
-
 // ── 起動 ─────────────────────────────────────────────────────
 async function init() {
-  window.addEventListener('message', handleBookmarkletMessage);
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sukimemo/sw.js').catch(() => {});
   }
   S.noteId = await db.getSetting('noteId');
+  S.proxyUrl = await db.getSetting('proxyUrl') ?? DEFAULT_PROXY;
   S.customChara = await db.getSetting('customChara') ?? null;
   await render();
 }

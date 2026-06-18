@@ -1,11 +1,10 @@
-const CACHE = 'sukimemo-v27';
+const CACHE = 'sukimemo-v28';
 const ASSETS = [
   '/sukimemo/',
   '/sukimemo/index.html',
   '/sukimemo/css/style.css',
   '/sukimemo/js/db.js',
   '/sukimemo/js/import.js',
-  '/sukimemo/js/bookmarklet.js',
   '/sukimemo/js/app.js',
   '/sukimemo/manifest.json',
 ];
