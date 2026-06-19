@@ -174,8 +174,18 @@ async function syncAll() {
             status:          'unconfirmed',
           });
         }
-        const isLast = data?.data?.isLastPage ?? data?.data?.is_last_page ?? true;
-        if (isLast || !rawLikes.length) break;
+        if (!rawLikes.length) break;
+        // likes APIのページ送り：isLastPage が無い場合もあるため
+        // 明示的な最終ページフラグ＋空ページの両方で判定
+        const isLast =
+          data?.data?.isLastPage ?? data?.data?.is_last_page ??
+          data?.isLastPage ?? data?.is_last_page;
+        if (isLast === true) break;
+        // next_page が明示されていればそれを使う
+        const nextPage = data?.data?.nextPage ?? data?.data?.next_page ??
+          data?.nextPage ?? data?.next_page;
+        if (nextPage != null) { lPage = nextPage; continue; }
+        // どちらも無い場合：ページを進めて空ページまで試行
         lPage++;
       }
       totalLikes += artLikes.length;
@@ -207,8 +217,9 @@ async function syncAll() {
     }
 
     const skipped = allContents.length - articlesToFetch.length;
-    S.syncResult = `更新完了：フォロワー 新規${addedF}人（全${allFollowers.length}人）` +
-      `／スキ 新規${addedL}件（${articlesToFetch.length}記事を取得・${skipped}記事はスキップ・全${totalLikes}件確認）`;
+    S.syncResult = `更新完了：フォロワー 新規${addedF}人（全${allFollowers.length}人・${fPage}ページ）` +
+      `／スキ 新規${addedL}件（${articlesToFetch.length}記事取得・${skipped}記事スキップ` +
+      `・全${allContents.length}記事・全${totalLikes}件確認）`;
     S.syncResultOk = true;
   } catch (err) {
     S.syncResult = `更新エラー：${err.message}`;

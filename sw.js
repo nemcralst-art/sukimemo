@@ -1,4 +1,4 @@
-const CACHE = 'sukimemo-v29';
+const CACHE = 'sukimemo-v30';
 const ASSETS = [
   '/sukimemo/',
   '/sukimemo/index.html',
