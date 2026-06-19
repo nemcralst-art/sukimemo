@@ -2,7 +2,7 @@ import * as db from './db.js';
 import { parseShortcutBundle, followersFromRaw, likesFromRaw } from './import.js';
 
 // ── アプリ名（1箇所で管理） ───────────────────────────────────
-const APP_NAME = 'スキめも';
+const APP_NAME = 'きろく帖';
 
 // ── プロキシ設定 ──────────────────────────────────────────────
 // TODO(配布時): プロキシURLをハードコードし、設定の編集欄は一般ユーザーから隠す。
@@ -993,11 +993,27 @@ function compressImage(file, maxSize = 400, quality = 0.75) {
 async function init() {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sukimemo/sw.js').catch(() => {});
+    // 新バージョン検知時のバナー表示
+    navigator.serviceWorker.addEventListener('message', e => {
+      if (e.data?.type === 'sw-updated') showUpdateBanner();
+    });
+    // controllerchange = 新SWがアクティブになった（別タブでの更新等）
+    navigator.serviceWorker.addEventListener('controllerchange', () => showUpdateBanner());
   }
   S.noteId = await db.getSetting('noteId');
   S.proxyUrl = await db.getSetting('proxyUrl') ?? DEFAULT_PROXY;
   S.customChara = await db.getSetting('customChara') ?? null;
   await render();
+}
+
+function showUpdateBanner() {
+  if (document.getElementById('update-banner')) return;
+  const div = document.createElement('div');
+  div.id = 'update-banner';
+  div.className = 'update-banner';
+  div.innerHTML = `新しいバージョンがあります <button id="update-reload" class="update-reload-btn">再読み込み</button>`;
+  document.body.prepend(div);
+  document.getElementById('update-reload').addEventListener('click', () => location.reload());
 }
 
 init();

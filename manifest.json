@@ -1,6 +1,6 @@
 {
-  "name": "スキめも",
-  "short_name": "スキめも",
+  "name": "きろく帖",
+  "short_name": "きろく帖",
   "description": "noteのスキとフォロワーを管理する手帖",
   "start_url": "/sukimemo/",
   "display": "standalone",
