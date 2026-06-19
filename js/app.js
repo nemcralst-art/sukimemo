@@ -272,7 +272,7 @@ async function render() {
 function renderSetup() {
   return `
     <header class="header">
-      <span class="header-title">${esc(APP_NAME)}　🐰</span>
+      <span class="header-title">${esc(APP_NAME)}</span>
     </header>
     <main class="main-content">
       <div class="setup-card">
@@ -307,7 +307,7 @@ function showSetupErr(msg) {
 function renderHeader() {
   return `
     <header class="header">
-      <span class="header-title">${esc(APP_NAME)}　🐰</span>
+      <span class="header-title">${esc(APP_NAME)}</span>
       <div class="header-btns">
         <button class="icon-btn" id="btn-settings" title="設定">⚙️</button>
       </div>
