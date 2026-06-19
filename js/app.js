@@ -5,6 +5,8 @@ import { parseShortcutBundle, followersFromRaw, likesFromRaw } from './import.js
 const APP_NAME = 'スキめも';
 
 // ── プロキシ設定 ──────────────────────────────────────────────
+// TODO(配布時): プロキシURLをハードコードし、設定の編集欄は一般ユーザーから隠す。
+// 全ユーザーの通信が作者のプロキシを通る＝共有中継の運用判断が必要。
 const DEFAULT_PROXY = 'https://note-proxy.nemcralst.workers.dev';
 
 // ── デフォルト応援キャラ（6枚 assets/ に同梱） ───────────────
@@ -31,7 +33,7 @@ const S = {
   proxyUrl:        DEFAULT_PROXY,
   tab:             'likes',
   likesFilter:     'unconfirmed',
-  likesSort:       'newest',
+  likesSort:       'newest',     // 'newest' | 'by-article' | 'by-person'
   follFilter:      'unconfirmed',
   panel:           null,
   importTab:       'bookmarklet',
@@ -62,6 +64,14 @@ const formatDate = iso => {
 };
 const randomCheer = () => CHEERS[Math.floor(Math.random() * CHEERS.length)];
 
+function updateUnconfirmedCount(type) {
+  if (type === 'likes') {
+    const remaining = document.querySelectorAll('.btn-confirm[data-type="like"]').length;
+    const badge = document.querySelector('.filter-btn.unconf.active .count-badge');
+    if (badge) badge.textContent = remaining;
+  }
+}
+
 // ── プロキシ経由fetch ─────────────────────────────────────────
 async function noteApiFetch(apiPath) {
   const url = `${S.proxyUrl}/?path=${encodeURIComponent(apiPath)}`;
@@ -90,7 +100,8 @@ async function syncAll() {
       const data = await noteApiFetch(`/api/v2/creators/${S.noteId}/followers?page=${fPage}`);
       const users = data?.data?.follows ?? [];
       if (users.length) allFollowers = allFollowers.concat(followersFromRaw(users));
-      if (data?.data?.isLastPage || !users.length) break;
+      const isLast = data?.data?.isLastPage ?? data?.data?.is_last_page ?? true;
+      if (isLast || !users.length) break;
       fPage++;
     }
     const addedF = await db.upsertFollowersNew(allFollowers, true);
@@ -101,10 +112,13 @@ async function syncAll() {
     let allContents = [];
     let cPage = 1;
     while (true) {
+      S.syncProgress = `記事一覧を取得中...（${cPage}ページ目）`;
+      updateSyncUI();
       const data = await noteApiFetch(`/api/v2/creators/${S.noteId}/contents?kind=note&page=${cPage}`);
       const contents = data?.data?.contents ?? [];
       if (contents.length) allContents = allContents.concat(contents);
-      if (data?.data?.isLastPage || !contents.length) break;
+      const isLast = data?.data?.isLastPage ?? data?.data?.is_last_page ?? true;
+      if (isLast || !contents.length) break;
       cPage++;
     }
 
@@ -140,7 +154,6 @@ async function syncAll() {
       while (true) {
         const data = await noteApiFetch(`/api/v3/notes/${art.key}/likes?page=${lPage}`);
         const rawLikes = data?.data?.likes ?? [];
-        if (!rawLikes.length) break;
         const now = new Date().toISOString();
         for (const item of rawLikes) {
           const u = item.user ?? item;
@@ -161,7 +174,8 @@ async function syncAll() {
             status:          'unconfirmed',
           });
         }
-        if (rawLikes.length < 10) break;
+        const isLast = data?.data?.isLastPage ?? data?.data?.is_last_page ?? true;
+        if (isLast || !rawLikes.length) break;
         lPage++;
       }
       totalLikes += artLikes.length;
@@ -209,6 +223,8 @@ async function syncAll() {
 function updateSyncUI() {
   const el = $('sync-progress');
   if (el) el.textContent = S.syncProgress;
+  const btn = $('btn-sync');
+  if (btn) { btn.disabled = S.syncing; btn.textContent = S.syncing ? '⏳ 更新中...' : '🔄 スキ・フォロワーを更新'; }
 }
 
 // ── メインレンダー ────────────────────────────────────────────
@@ -338,6 +354,7 @@ function renderLikesTab(likes) {
         <select id="likes-sort" class="sort-sel">
           <option value="newest"     ${S.likesSort==='newest'?'selected':''}>新しい順</option>
           <option value="by-article" ${S.likesSort==='by-article'?'selected':''}>記事ごと順</option>
+          <option value="by-person"  ${S.likesSort==='by-person'?'selected':''}>人ごと順</option>
         </select>
       </div>` : ''}
     </div>
@@ -356,6 +373,7 @@ function renderLikesUnconfirmed(items, allLikes) {
   const map = new Map();
   const sorted = [...items].sort((a, b) => {
     if (S.likesSort === 'newest') return (b.detectedDate ?? '').localeCompare(a.detectedDate ?? '');
+    if (S.likesSort === 'by-person') return (a.userName ?? '').localeCompare(b.userName ?? '');
     return (a.noteKey ?? '').localeCompare(b.noteKey ?? '');
   });
   sorted.forEach(l => {
@@ -656,7 +674,26 @@ function bindMain(likes, followers) {
     document.querySelectorAll('.btn-confirm[data-type="like"]').forEach(btn => {
       btn.addEventListener('click', async () => {
         await db.updateLikeStatus(btn.dataset.id, 'confirmed');
-        render();
+        // その場でこの行だけフェードアウト（リスト全体は再ソートしない）
+        const row = btn.closest('.article-row');
+        if (row) {
+          row.style.transition = 'opacity .3s';
+          row.style.opacity = '0';
+          setTimeout(() => {
+            row.remove();
+            // 親カードの記事がすべて確認済みになったら親も消す
+            const card = document.querySelector(`.person-card[data-user="${CSS.escape(btn.dataset.id.split('_')[0])}"]`);
+            if (card && !card.querySelector('.btn-confirm')) {
+              card.style.transition = 'opacity .3s';
+              card.style.opacity = '0';
+              setTimeout(() => card.remove(), 300);
+            }
+            // バッジ数を更新
+            updateUnconfirmedCount('likes');
+          }, 300);
+        } else {
+          render();
+        }
       });
     });
     document.querySelectorAll('.btn-revert[data-type="like"]').forEach(btn => {
