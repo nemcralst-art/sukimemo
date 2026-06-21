@@ -4,10 +4,8 @@ import { parseShortcutBundle, followersFromRaw, likesFromRaw } from './import.js
 // ── アプリ名（1箇所で管理） ───────────────────────────────────
 const APP_NAME = 'きろく帖';
 
-// ── プロキシ設定 ──────────────────────────────────────────────
-// TODO(配布時): プロキシURLをハードコードし、設定の編集欄は一般ユーザーから隠す。
-// 全ユーザーの通信が作者のプロキシを通る＝共有中継の運用判断が必要。
-const DEFAULT_PROXY = 'https://note-proxy.nemcralst.workers.dev';
+// ── プロキシ設定（ハードコード・設定画面には非表示） ──────────
+const PROXY_URL = 'https://note-proxy.nemcralst.workers.dev';
 
 // ── デフォルト応援キャラ（6枚 assets/ に同梱） ───────────────
 const DEFAULT_CHARAS = [
@@ -30,7 +28,6 @@ const CHEERS = [
 // ── 状態 ─────────────────────────────────────────────────────
 const S = {
   noteId:          null,
-  proxyUrl:        DEFAULT_PROXY,
   tab:             'likes',
   likesFilter:     'unconfirmed',
   likesSort:       'newest',     // 'newest' | 'by-article' | 'by-person'
@@ -74,7 +71,7 @@ function updateUnconfirmedCount(type) {
 
 // ── プロキシ経由fetch ─────────────────────────────────────────
 async function noteApiFetch(apiPath) {
-  const url = `${S.proxyUrl}/?path=${encodeURIComponent(apiPath)}`;
+  const url = `${PROXY_URL}/?path=${encodeURIComponent(apiPath)}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
@@ -604,13 +601,6 @@ function renderSettingsPanel() {
             </div>
           </div>
           <div class="settings-row">
-            <label class="settings-label">プロキシURL</label>
-            <div class="settings-id-row">
-              <code class="settings-id-val" style="font-size:11px;word-break:break-all">${esc(S.proxyUrl)}</code>
-              <button class="btn-text" id="btn-change-proxy">変更</button>
-            </div>
-          </div>
-          <div class="settings-row">
             <label class="settings-label">応援キャラ</label>
             <div class="settings-chara-row">
               <img class="settings-chara-preview" src="${esc(S.customChara || DEFAULT_CHARAS[0])}" alt="">
@@ -774,14 +764,6 @@ function bindMain(likes, followers) {
         S.noteId = newId.trim();
         await db.setSetting('noteId', S.noteId);
         S.panel = null;
-        render();
-      }
-    });
-    $('btn-change-proxy')?.addEventListener('click', async () => {
-      const newUrl = prompt('プロキシURL', S.proxyUrl);
-      if (newUrl && newUrl.trim()) {
-        S.proxyUrl = newUrl.trim().replace(/\/$/, '');
-        await db.setSetting('proxyUrl', S.proxyUrl);
         render();
       }
     });
@@ -1001,7 +983,6 @@ async function init() {
     navigator.serviceWorker.addEventListener('controllerchange', () => showUpdateBanner());
   }
   S.noteId = await db.getSetting('noteId');
-  S.proxyUrl = await db.getSetting('proxyUrl') ?? DEFAULT_PROXY;
   S.customChara = await db.getSetting('customChara') ?? null;
   await render();
 }
